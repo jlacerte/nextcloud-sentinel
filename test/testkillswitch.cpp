@@ -385,6 +385,43 @@ private slots:
         QVERIFY(qAbs(entropy - 8.0) < 0.001);
     }
 
+    void testEntropyDetectorWhitelist()
+    {
+        // Compressed/media files should be whitelisted
+        EntropyDetector detector;
+
+        // These should be recognized as normally high-entropy
+        QVERIFY(detector.isNormallyHighEntropy("image.jpg"));
+        QVERIFY(detector.isNormallyHighEntropy("video.mp4"));
+        QVERIFY(detector.isNormallyHighEntropy("archive.zip"));
+        QVERIFY(detector.isNormallyHighEntropy("document.pdf"));
+        QVERIFY(detector.isNormallyHighEntropy("compressed.7z"));
+
+        // These should NOT be whitelisted
+        QVERIFY(!detector.isNormallyHighEntropy("script.py"));
+        QVERIFY(!detector.isNormallyHighEntropy("code.cpp"));
+        QVERIFY(!detector.isNormallyHighEntropy("readme.txt"));
+        QVERIFY(!detector.isNormallyHighEntropy("data.csv"));
+    }
+
+    void testEntropyDetectorExpectedRange()
+    {
+        EntropyDetector detector;
+
+        // Test expected ranges for different file types
+        auto textRange = detector.expectedEntropyRange("readme.txt");
+        QVERIFY(textRange.first >= 2.0 && textRange.first <= 4.0);
+        QVERIFY(textRange.second >= 5.0 && textRange.second <= 6.0);
+
+        auto codeRange = detector.expectedEntropyRange("main.cpp");
+        QVERIFY(codeRange.first >= 3.0 && codeRange.first <= 5.0);
+        QVERIFY(codeRange.second >= 5.5 && codeRange.second <= 7.0);
+
+        auto unknownRange = detector.expectedEntropyRange("mystery.xyz");
+        QCOMPARE(unknownRange.first, 0.0);
+        QCOMPARE(unknownRange.second, 8.0);
+    }
+
     // ==================== PatternDetector Tests ====================
 
     void testPatternDetectorCreation()

@@ -87,6 +87,113 @@ double EntropyDetector::calculateFileEntropy(const QString &filePath, int sample
     return calculateEntropy(data);
 }
 
+double EntropyDetector::calculateMultiBlockEntropy(const QString &filePath) const
+{
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return -1.0;
+    }
+
+    qint64 fileSize = file.size();
+    if (fileSize == 0) {
+        file.close();
+        return 0.0;
+    }
+
+    // Small files: analyze entirely
+    if (fileSize <= SMALL_FILE_THRESHOLD) {
+        QByteArray data = file.readAll();
+        file.close();
+        return calculateEntropy(data);
+    }
+
+    // Collect samples based on file size
+    QVector<qint64> sampleOffsets;
+    int blockSize = SAMPLE_BLOCK_SIZE;
+
+    if (fileSize <= MEDIUM_FILE_THRESHOLD) {
+        // Medium files: 3 samples (beginning, middle, end)
+        sampleOffsets = {
+            0,
+            (fileSize / 2) - (blockSize / 2),
+            fileSize - blockSize
+        };
+    } else {
+        // Large files: 5 samples distributed evenly
+        qint64 step = fileSize / 5;
+        for (int i = 0; i < 5; i++) {
+            sampleOffsets.append(i * step);
+        }
+    }
+
+    // Read and analyze each sample
+    double maxEntropy = 0.0;
+    double totalEntropy = 0.0;
+    int sampleCount = 0;
+
+    for (qint64 offset : sampleOffsets) {
+        // Ensure we don't read past end of file
+        if (offset + blockSize > fileSize) {
+            offset = fileSize - blockSize;
+        }
+        if (offset < 0) {
+            offset = 0;
+        }
+
+        if (!file.seek(offset)) {
+            continue;
+        }
+
+        QByteArray sample = file.read(blockSize);
+        if (sample.isEmpty()) {
+            continue;
+        }
+
+        double entropy = calculateEntropy(sample);
+        totalEntropy += entropy;
+        sampleCount++;
+
+        if (entropy > maxEntropy) {
+            maxEntropy = entropy;
+        }
+
+        // Early exit: if first sample shows very high entropy, likely encrypted
+        if (sampleCount == 1 && entropy >= m_highThreshold) {
+            file.close();
+            return entropy; // Return early - definitely suspicious
+        }
+    }
+
+    file.close();
+
+    if (sampleCount == 0) {
+        return -1.0;
+    }
+
+    // Return the maximum entropy found (most conservative approach)
+    // Alternatively, could return average: totalEntropy / sampleCount
+    return maxEntropy;
+}
+
+void EntropyDetector::updateCache(const QString &filePath, double entropy) const
+{
+    // Remove from current position if exists
+    int existingIndex = m_cacheOrder.indexOf(filePath);
+    if (existingIndex >= 0) {
+        m_cacheOrder.removeAt(existingIndex);
+    }
+
+    // Add to end (most recently used)
+    m_cacheOrder.append(filePath);
+    m_entropyCache[filePath] = entropy;
+
+    // Evict oldest if over limit
+    while (m_cacheOrder.size() > m_cacheMaxSize && !m_cacheOrder.isEmpty()) {
+        QString oldest = m_cacheOrder.takeFirst();
+        m_entropyCache.remove(oldest);
+    }
+}
+
 bool EntropyDetector::isNormallyHighEntropy(const QString &filePath) const
 {
     QString lower = filePath.toLower();
@@ -175,8 +282,9 @@ ThreatInfo EntropyDetector::analyze(const SyncFileItem &item,
         return result;
     }
 
-    // Calculate current entropy
-    double entropy = calculateFileEntropy(item._file, m_sampleSize);
+    // Calculate current entropy using multi-block sampling for accuracy
+    // This is more reliable for detecting partial encryption
+    double entropy = calculateMultiBlockEntropy(item._file);
     if (entropy < 0) {
         return result; // Could not read file
     }
@@ -215,8 +323,8 @@ ThreatInfo EntropyDetector::analyze(const SyncFileItem &item,
         }
     }
 
-    // Update cache
-    m_entropyCache[item._file] = entropy;
+    // Update cache with LRU eviction
+    updateCache(item._file, entropy);
 
     return result;
 }
