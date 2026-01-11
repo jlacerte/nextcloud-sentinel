@@ -1,11 +1,15 @@
 # SPDX-FileCopyrightText: 2017 Nextcloud GmbH and Nextcloud contributors
 # SPDX-FileCopyrightText: 2014 ownCloud GmbH
+# SPDX-FileCopyrightText: 2026 Nextcloud Sentinel Project
 # SPDX-License-Identifier: GPL-2.0-or-later
 project(libsync)
 find_package(KF6Archive REQUIRED)
 include(DefinePlatformDefaults)
 
 set(CMAKE_AUTOMOC TRUE)
+
+# Nextcloud Sentinel - Kill Switch Module
+add_subdirectory(killswitch)
 
 if ( APPLE )
     list(APPEND OS_SPECIFIC_LINK_LIBRARIES
@@ -164,6 +168,18 @@ set(libsync_SRCS
     creds/keychainchunk.cpp
     caseclashconflictsolver.h
     caseclashconflictsolver.cpp
+
+    # Nextcloud Sentinel - Kill Switch Module
+    killswitch/killswitchmanager.h
+    killswitch/killswitchmanager.cpp
+    killswitch/threatdetector.h
+    killswitch/detectors/massdeletedetector.h
+    killswitch/detectors/massdeletedetector.cpp
+    killswitch/detectors/entropydetector.h
+    killswitch/detectors/entropydetector.cpp
+    killswitch/detectors/canarydetector.h
+    killswitch/detectors/canarydetector.cpp
+    killswitch/actions/syncaction.h
 )
 
 if (WIN32)
