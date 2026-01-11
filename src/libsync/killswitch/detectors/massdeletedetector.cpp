@@ -15,7 +15,7 @@ MassDeleteDetector::MassDeleteDetector()
 }
 
 ThreatInfo MassDeleteDetector::analyze(const SyncFileItem &item,
-                                        const QVector<KillSwitchManager::Event> &recentEvents)
+                                        const QVector<struct KillSwitchManager::Event> &recentEvents)
 {
     ThreatInfo result;
     result.level = ThreatLevel::None;

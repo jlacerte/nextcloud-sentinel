@@ -25,6 +25,9 @@
 #include "discoveryphase.h"
 #include "common/checksums.h"
 
+// Nextcloud Sentinel - Kill Switch
+#include "killswitch/killswitchmanager.h"
+
 class QProcess;
 
 namespace OCC {
@@ -197,6 +200,11 @@ signals:
 
     void lockFileDetected(const QString &lockFile);
 
+    // Nextcloud Sentinel - Kill Switch signals
+    void killSwitchTriggered(const QString &reason);
+    void killSwitchThreatDetected(const OCC::ThreatInfo &threat);
+    void killSwitchReset();
+
 private slots:
     void slotFolderDiscovered(bool local, const QString &folder);
     void slotRootEtagReceived(const QByteArray &, const QDateTime &time);
@@ -237,6 +245,10 @@ private slots:
     void slotCleanupScheduledSyncTimers();
 
     void remnantReadOnlyFolderDiscovered(const OCC::SyncFileItemPtr &item);
+
+    // Nextcloud Sentinel - Kill Switch slots
+    void slotKillSwitchTriggered(const QString &reason);
+    void slotKillSwitchThreatDetected(const OCC::ThreatInfo &threat);
 
 private:
     // Some files need a sync run to be executed at a specified time after
@@ -347,6 +359,9 @@ private:
     QScopedPointer<SyncFileStatusTracker> _syncFileStatusTracker;
     Utility::StopWatch _stopWatch;
 
+    // Nextcloud Sentinel - Kill Switch Manager
+    QScopedPointer<KillSwitchManager> _killSwitchManager;
+
     /**
      * check if we are allowed to propagate everything, and if we are not, adjust the instructions
      * to recover
@@ -364,6 +379,9 @@ private:
     void finishSync();
 
     bool handleMassDeletion();
+
+    // Nextcloud Sentinel - Kill Switch threat analysis
+    bool handleKillSwitchAnalysis();
 
     void handleRemnantReadOnlyFolders();
 

@@ -41,7 +41,7 @@ public:
      * @return ThreatInfo with level None if no threat detected
      */
     virtual ThreatInfo analyze(const SyncFileItem &item,
-                               const QVector<KillSwitchManager::Event> &recentEvents) = 0;
+                               const QVector<struct KillSwitchManager::Event> &recentEvents) = 0;
 
     /**
      * @brief Check if the detector is enabled

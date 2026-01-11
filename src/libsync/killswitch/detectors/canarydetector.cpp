@@ -63,7 +63,7 @@ bool CanaryDetector::isCanaryFile(const QString &filePath) const
 }
 
 ThreatInfo CanaryDetector::analyze(const SyncFileItem &item,
-                                    const QVector<KillSwitchManager::Event> &recentEvents)
+                                    const QVector<struct KillSwitchManager::Event> &recentEvents)
 {
     Q_UNUSED(recentEvents)
 

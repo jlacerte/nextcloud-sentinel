@@ -30,7 +30,7 @@ public:
     QString name() const override { return QStringLiteral("CanaryDetector"); }
 
     ThreatInfo analyze(const SyncFileItem &item,
-                       const QVector<KillSwitchManager::Event> &recentEvents) override;
+                       const QVector<struct KillSwitchManager::Event> &recentEvents) override;
 
     /**
      * @brief Add a canary file pattern

@@ -30,7 +30,7 @@ public:
     QString name() const override { return QStringLiteral("MassDeleteDetector"); }
 
     ThreatInfo analyze(const SyncFileItem &item,
-                       const QVector<KillSwitchManager::Event> &recentEvents) override;
+                       const QVector<struct KillSwitchManager::Event> &recentEvents) override;
 
     // Configuration
     void setThreshold(int count) { m_threshold = count; }

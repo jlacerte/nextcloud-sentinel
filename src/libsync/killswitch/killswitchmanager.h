@@ -69,6 +69,15 @@ class KillSwitchManager : public QObject
     Q_PROPERTY(ThreatLevel currentThreatLevel READ currentThreatLevel NOTIFY threatLevelChanged)
 
 public:
+    /**
+     * @brief Event structure for tracking file operations
+     */
+    struct Event {
+        QDateTime timestamp;
+        QString type;
+        QString path;
+    };
+
     explicit KillSwitchManager(QObject *parent = nullptr);
     ~KillSwitchManager() override;
 
@@ -171,11 +180,6 @@ private:
     QVector<ThreatInfo> m_threats;
 
     // Event tracking
-    struct Event {
-        QDateTime timestamp;
-        QString type;
-        QString path;
-    };
     QVector<Event> m_recentEvents;
     QTimer m_windowTimer;
     QMutex m_mutex;

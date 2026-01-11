@@ -147,7 +147,7 @@ QPair<double, double> EntropyDetector::expectedEntropyRange(const QString &fileP
 }
 
 ThreatInfo EntropyDetector::analyze(const SyncFileItem &item,
-                                     const QVector<KillSwitchManager::Event> &recentEvents)
+                                     const QVector<struct KillSwitchManager::Event> &recentEvents)
 {
     Q_UNUSED(recentEvents)
 

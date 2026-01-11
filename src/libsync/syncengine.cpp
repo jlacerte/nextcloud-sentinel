@@ -24,6 +24,12 @@
 #include "clientsideencryption.h"
 #include "clientsideencryptionjobs.h"
 
+// Nextcloud Sentinel - Kill Switch
+#include "killswitch/killswitchmanager.h"
+#include "killswitch/detectors/massdeletedetector.h"
+#include "killswitch/detectors/entropydetector.h"
+#include "killswitch/detectors/canarydetector.h"
+
 #ifdef Q_OS_WIN
 #include <windows.h>
 #else
@@ -100,6 +106,22 @@ SyncEngine::SyncEngine(AccountPtr account,
     _excludedFiles.reset(new ExcludedFiles(localPath));
 
     _syncFileStatusTracker.reset(new SyncFileStatusTracker(this));
+
+    // Nextcloud Sentinel - Initialize Kill Switch Manager
+    _killSwitchManager.reset(new KillSwitchManager(this));
+
+    // Register threat detectors
+    _killSwitchManager->registerDetector(std::make_shared<MassDeleteDetector>());
+    _killSwitchManager->registerDetector(std::make_shared<EntropyDetector>());
+    _killSwitchManager->registerDetector(std::make_shared<CanaryDetector>());
+
+    // Connect kill switch signals
+    connect(_killSwitchManager.data(), &KillSwitchManager::syncPaused,
+            this, &SyncEngine::slotKillSwitchTriggered);
+    connect(_killSwitchManager.data(), &KillSwitchManager::threatDetected,
+            this, &SyncEngine::slotKillSwitchThreatDetected);
+
+    qCInfo(lcEngine) << "Nextcloud Sentinel: Kill Switch protection enabled";
 
     _clearTouchedFilesTimer.setSingleShot(true);
     _clearTouchedFilesTimer.setInterval(30 * 1000);
@@ -835,6 +857,12 @@ void SyncEngine::slotDiscoveryFinished()
     _progressInfo->_status = ProgressInfo::Reconcile;
     emit transmissionProgress(*_progressInfo);
 
+    // Nextcloud Sentinel - Check for threats before proceeding
+    if (handleKillSwitchAnalysis()) {
+        qCWarning(lcEngine) << "Kill Switch triggered - sync aborted";
+        return;
+    }
+
     if (handleMassDeletion()) {
         return;
     }
@@ -1149,6 +1177,86 @@ bool SyncEngine::handleMassDeletion()
         return true;
     }
     return false;
+}
+
+// Nextcloud Sentinel - Kill Switch Analysis
+bool SyncEngine::handleKillSwitchAnalysis()
+{
+    if (!_killSwitchManager || !_killSwitchManager->isEnabled()) {
+        return false;
+    }
+
+    // If already triggered, block sync
+    if (_killSwitchManager->isTriggered()) {
+        qCWarning(lcEngine) << "Sentinel: Kill Switch already triggered, blocking sync";
+        Q_EMIT syncError(tr("Sync blocked: Kill Switch protection is active. Please review the threat alerts."),
+                         ErrorCategory::GenericError);
+        finalize(false);
+        return true;
+    }
+
+    qCInfo(lcEngine) << "Sentinel: Analyzing" << _syncItems.size() << "items for threats";
+
+    // Analyze each sync item
+    int deleteCount = 0;
+    int modifyCount = 0;
+    int suspiciousCount = 0;
+
+    for (const auto &item : std::as_const(_syncItems)) {
+        // Track operations
+        if (item->_instruction == CSYNC_INSTRUCTION_REMOVE) {
+            deleteCount++;
+        } else if (item->_instruction == CSYNC_INSTRUCTION_SYNC ||
+                   item->_instruction == CSYNC_INSTRUCTION_CONFLICT) {
+            modifyCount++;
+        }
+
+        // Run through kill switch analysis
+        if (_killSwitchManager->analyzeItem(*item)) {
+            suspiciousCount++;
+        }
+
+        // Check if kill switch was triggered during analysis
+        if (_killSwitchManager->isTriggered()) {
+            qCCritical(lcEngine) << "Sentinel: KILL SWITCH TRIGGERED during analysis!";
+            Q_EMIT syncError(tr("Kill Switch triggered: Potential threat detected. Sync has been paused."),
+                             ErrorCategory::GenericError);
+            finalize(false);
+            return true;
+        }
+    }
+
+    qCInfo(lcEngine) << "Sentinel: Analysis complete -"
+                     << "Deletes:" << deleteCount
+                     << "Modifies:" << modifyCount
+                     << "Suspicious:" << suspiciousCount
+                     << "Threat Level:" << static_cast<int>(_killSwitchManager->currentThreatLevel());
+
+    return false;
+}
+
+void SyncEngine::slotKillSwitchTriggered(const QString &reason)
+{
+    qCCritical(lcEngine) << "Sentinel: KILL SWITCH TRIGGERED -" << reason;
+
+    // Abort current sync if running
+    if (_syncRunning) {
+        abort();
+    }
+
+    // Emit signal for GUI notification
+    emit killSwitchTriggered(reason);
+}
+
+void SyncEngine::slotKillSwitchThreatDetected(const ThreatInfo &threat)
+{
+    qCWarning(lcEngine) << "Sentinel: Threat detected -"
+                        << "Level:" << static_cast<int>(threat.level)
+                        << "Detector:" << threat.detectorName
+                        << "Description:" << threat.description;
+
+    // Emit signal for GUI notification
+    emit killSwitchThreatDetected(threat);
 }
 
 void SyncEngine::handleRemnantReadOnlyFolders()

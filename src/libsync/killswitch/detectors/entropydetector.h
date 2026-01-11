@@ -32,7 +32,7 @@ public:
     QString name() const override { return QStringLiteral("EntropyDetector"); }
 
     ThreatInfo analyze(const SyncFileItem &item,
-                       const QVector<KillSwitchManager::Event> &recentEvents) override;
+                       const QVector<struct KillSwitchManager::Event> &recentEvents) override;
 
     // Configuration
     void setHighEntropyThreshold(double threshold) { m_highThreshold = threshold; }
