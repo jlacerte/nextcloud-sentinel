@@ -93,18 +93,19 @@ void KillSwitchSettings::loadSettings()
 {
     _loading = true;
 
-    ConfigFile cfg;
+    // Use QSettings directly via ConfigFile's settingsWithGroup
+    auto settings = ConfigFile::settingsWithGroup(QStringLiteral("KillSwitch"));
 
     // Load settings from config
-    _ui->enableKillSwitch->setChecked(cfg.getValue("killSwitch/enabled", true).toBool());
-    _ui->deleteThresholdSpinBox->setValue(cfg.getValue("killSwitch/deleteThreshold", 10).toInt());
-    _ui->timeWindowSpinBox->setValue(cfg.getValue("killSwitch/timeWindow", 60).toInt());
-    _ui->entropyThresholdSpinBox->setValue(cfg.getValue("killSwitch/entropyThreshold", 7.5).toDouble());
+    _ui->enableKillSwitch->setChecked(settings->value(QStringLiteral("enabled"), true).toBool());
+    _ui->deleteThresholdSpinBox->setValue(settings->value(QStringLiteral("deleteThreshold"), 10).toInt());
+    _ui->timeWindowSpinBox->setValue(settings->value(QStringLiteral("timeWindow"), 60).toInt());
+    _ui->entropyThresholdSpinBox->setValue(settings->value(QStringLiteral("entropyThreshold"), 7.5).toDouble());
 
     // Load canary files
     _ui->canaryListWidget->clear();
-    QStringList canaryFiles = cfg.getValue("killSwitch/canaryFiles",
-                                           QStringList{"_canary.txt", ".canary", "zzz_canary.txt"}).toStringList();
+    QStringList defaultCanaryFiles = {QStringLiteral("_canary.txt"), QStringLiteral(".canary"), QStringLiteral("zzz_canary.txt")};
+    QStringList canaryFiles = settings->value(QStringLiteral("canaryFiles"), defaultCanaryFiles).toStringList();
     for (const QString &file : canaryFiles) {
         _ui->canaryListWidget->addItem(file);
     }
@@ -119,19 +120,20 @@ void KillSwitchSettings::saveSettings()
 {
     if (_loading) return;
 
-    ConfigFile cfg;
+    // Use QSettings directly via ConfigFile's settingsWithGroup
+    auto settings = ConfigFile::settingsWithGroup(QStringLiteral("KillSwitch"));
 
-    cfg.setValue("killSwitch/enabled", _ui->enableKillSwitch->isChecked());
-    cfg.setValue("killSwitch/deleteThreshold", _ui->deleteThresholdSpinBox->value());
-    cfg.setValue("killSwitch/timeWindow", _ui->timeWindowSpinBox->value());
-    cfg.setValue("killSwitch/entropyThreshold", _ui->entropyThresholdSpinBox->value());
+    settings->setValue(QStringLiteral("enabled"), _ui->enableKillSwitch->isChecked());
+    settings->setValue(QStringLiteral("deleteThreshold"), _ui->deleteThresholdSpinBox->value());
+    settings->setValue(QStringLiteral("timeWindow"), _ui->timeWindowSpinBox->value());
+    settings->setValue(QStringLiteral("entropyThreshold"), _ui->entropyThresholdSpinBox->value());
 
     // Save canary files
     QStringList canaryFiles;
     for (int i = 0; i < _ui->canaryListWidget->count(); ++i) {
         canaryFiles << _ui->canaryListWidget->item(i)->text();
     }
-    cfg.setValue("killSwitch/canaryFiles", canaryFiles);
+    settings->setValue(QStringLiteral("canaryFiles"), canaryFiles);
 
     qCInfo(lcKillSwitchSettings) << "Kill Switch settings saved";
 }
@@ -280,7 +282,7 @@ void KillSwitchSettings::slotThreatDetected(const ThreatInfo &threat)
     updateStatusIndicator();
 }
 
-void KillSwitchSettings::slotThreatLevelChanged(int level)
+void KillSwitchSettings::slotThreatLevelChanged(int /*level*/)
 {
     updateStatusIndicator();
 }
