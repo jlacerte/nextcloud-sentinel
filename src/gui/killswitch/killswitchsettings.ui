@@ -101,6 +101,43 @@
      </property>
      <layout class="QFormLayout" name="settingsLayout">
       <item row="0" column="0">
+       <widget class="QLabel" name="presetLabel">
+        <property name="text">
+         <string>Security preset:</string>
+        </property>
+        <property name="toolTip">
+         <string>Quick configuration presets for different security levels</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QComboBox" name="presetComboBox">
+        <property name="toolTip">
+         <string>Choose a preset or customize settings below</string>
+        </property>
+        <item>
+         <property name="text">
+          <string>Light - Fewer alerts, higher thresholds</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Standard - Balanced protection (Recommended)</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Paranoid - Maximum detection, lower thresholds</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Custom</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item row="1" column="0">
        <widget class="QLabel" name="deleteThresholdLabel">
         <property name="text">
          <string>Mass deletion threshold:</string>
@@ -110,7 +147,7 @@
         </property>
        </widget>
       </item>
-      <item row="0" column="1">
+      <item row="1" column="1">
        <layout class="QHBoxLayout" name="deleteLayout">
         <item>
          <widget class="QSpinBox" name="deleteThresholdSpinBox">
@@ -134,7 +171,7 @@
         </item>
        </layout>
       </item>
-      <item row="1" column="0">
+      <item row="2" column="0">
        <widget class="QLabel" name="timeWindowLabel">
         <property name="text">
          <string>Time window:</string>
@@ -144,7 +181,7 @@
         </property>
        </widget>
       </item>
-      <item row="1" column="1">
+      <item row="2" column="1">
        <layout class="QHBoxLayout" name="timeLayout">
         <item>
          <widget class="QSpinBox" name="timeWindowSpinBox">
@@ -168,7 +205,7 @@
         </item>
        </layout>
       </item>
-      <item row="2" column="0">
+      <item row="3" column="0">
        <widget class="QLabel" name="entropyThresholdLabel">
         <property name="text">
          <string>Entropy threshold:</string>
@@ -178,7 +215,7 @@
         </property>
        </widget>
       </item>
-      <item row="2" column="1">
+      <item row="3" column="1">
        <layout class="QHBoxLayout" name="entropyLayout">
         <item>
          <widget class="QDoubleSpinBox" name="entropyThresholdSpinBox">

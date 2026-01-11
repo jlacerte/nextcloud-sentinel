@@ -16,6 +16,7 @@
 #include <QSpinBox>
 #include <QDoubleSpinBox>
 #include <QPushButton>
+#include <QComboBox>
 #include <QListWidget>
 #include <QListWidgetItem>
 #include <QMessageBox>
@@ -55,6 +56,10 @@ void KillSwitchSettings::setupConnections()
     // Enable/disable toggle
     connect(_ui->enableKillSwitch, &QCheckBox::toggled,
             this, &KillSwitchSettings::slotEnableToggled);
+
+    // Preset selection
+    connect(_ui->presetComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &KillSwitchSettings::slotPresetChanged);
 
     // Threshold settings
     connect(_ui->deleteThresholdSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
@@ -110,6 +115,9 @@ void KillSwitchSettings::loadSettings()
         _ui->canaryListWidget->addItem(file);
     }
 
+    // Detect current preset based on values
+    updatePresetComboBox();
+
     _loading = false;
 
     updateThreatDisplay();
@@ -153,12 +161,91 @@ void KillSwitchSettings::slotEnableToggled(bool enabled)
     qCInfo(lcKillSwitchSettings) << "Kill Switch" << (enabled ? "enabled" : "disabled");
 }
 
+void KillSwitchSettings::slotPresetChanged(int index)
+{
+    if (_loading) return;
+
+    // Don't apply if already applying a preset (prevents recursion)
+    if (_applyingPreset) return;
+
+    // Only apply if user selected a non-custom preset
+    if (index != PresetCustom) {
+        applyPreset(index);
+        qCInfo(lcKillSwitchSettings) << "Preset changed to:" << index;
+    }
+}
+
+void KillSwitchSettings::applyPreset(int index)
+{
+    _applyingPreset = true;
+
+    switch (index) {
+    case PresetLight:
+        // Light: Fewer alerts, higher thresholds
+        _ui->deleteThresholdSpinBox->setValue(20);
+        _ui->timeWindowSpinBox->setValue(90);
+        _ui->entropyThresholdSpinBox->setValue(7.9);
+        break;
+
+    case PresetStandard:
+        // Standard: Balanced protection (default)
+        _ui->deleteThresholdSpinBox->setValue(10);
+        _ui->timeWindowSpinBox->setValue(60);
+        _ui->entropyThresholdSpinBox->setValue(7.5);
+        break;
+
+    case PresetParanoid:
+        // Paranoid: Maximum detection, lower thresholds
+        _ui->deleteThresholdSpinBox->setValue(5);
+        _ui->timeWindowSpinBox->setValue(30);
+        _ui->entropyThresholdSpinBox->setValue(7.2);
+        break;
+
+    default:
+        break;
+    }
+
+    _applyingPreset = false;
+    saveSettings();
+}
+
+void KillSwitchSettings::updatePresetComboBox()
+{
+    int deleteThreshold = _ui->deleteThresholdSpinBox->value();
+    int timeWindow = _ui->timeWindowSpinBox->value();
+    double entropyThreshold = _ui->entropyThresholdSpinBox->value();
+
+    int detectedPreset = PresetCustom;
+
+    // Check if current values match any preset
+    if (deleteThreshold == 20 && timeWindow == 90 &&
+        qFuzzyCompare(entropyThreshold, 7.9)) {
+        detectedPreset = PresetLight;
+    } else if (deleteThreshold == 10 && timeWindow == 60 &&
+               qFuzzyCompare(entropyThreshold, 7.5)) {
+        detectedPreset = PresetStandard;
+    } else if (deleteThreshold == 5 && timeWindow == 30 &&
+               qFuzzyCompare(entropyThreshold, 7.2)) {
+        detectedPreset = PresetParanoid;
+    }
+
+    // Update combobox without triggering signal
+    _ui->presetComboBox->blockSignals(true);
+    _ui->presetComboBox->setCurrentIndex(detectedPreset);
+    _ui->presetComboBox->blockSignals(false);
+}
+
 void KillSwitchSettings::slotDeleteThresholdChanged(int value)
 {
     if (auto *manager = KillSwitchManager::instance()) {
         manager->setDeleteThreshold(value, _ui->timeWindowSpinBox->value());
     }
     saveSettings();
+
+    // Update preset indicator if not applying a preset
+    if (!_applyingPreset && !_loading) {
+        updatePresetComboBox();
+    }
 }
 
 void KillSwitchSettings::slotTimeWindowChanged(int value)
@@ -167,6 +254,11 @@ void KillSwitchSettings::slotTimeWindowChanged(int value)
         manager->setDeleteThreshold(_ui->deleteThresholdSpinBox->value(), value);
     }
     saveSettings();
+
+    // Update preset indicator if not applying a preset
+    if (!_applyingPreset && !_loading) {
+        updatePresetComboBox();
+    }
 }
 
 void KillSwitchSettings::slotEntropyThresholdChanged(double value)
@@ -175,6 +267,11 @@ void KillSwitchSettings::slotEntropyThresholdChanged(double value)
         manager->setEntropyThreshold(value);
     }
     saveSettings();
+
+    // Update preset indicator if not applying a preset
+    if (!_applyingPreset && !_loading) {
+        updatePresetComboBox();
+    }
 }
 
 void KillSwitchSettings::slotAddCanaryFile()

@@ -46,6 +46,7 @@ public slots:
 
 private slots:
     void slotEnableToggled(bool enabled);
+    void slotPresetChanged(int index);
     void slotDeleteThresholdChanged(int value);
     void slotTimeWindowChanged(int value);
     void slotEntropyThresholdChanged(double value);
@@ -64,9 +65,20 @@ private:
     void updateThreatDisplay();
     void updateStatusIndicator();
     void customizeStyle();
+    void applyPreset(int index);
+    void updatePresetComboBox();
+
+    // Preset indices
+    enum PresetIndex {
+        PresetLight = 0,
+        PresetStandard = 1,
+        PresetParanoid = 2,
+        PresetCustom = 3
+    };
 
     Ui::KillSwitchSettings *_ui;
     bool _loading = false;
+    bool _applyingPreset = false;
 };
 
 } // namespace OCC
