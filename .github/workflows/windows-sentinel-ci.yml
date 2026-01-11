@@ -1,0 +1,278 @@
+# SPDX-FileCopyrightText: 2026 Nextcloud Sentinel Project
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+name: Windows Sentinel CI
+
+on:
+  push:
+    branches:
+      - master
+      - 'sentinel-*'
+    paths:
+      - 'src/libsync/killswitch/**'
+      - 'src/gui/killswitch/**'
+      - 'test/testkillswitch.cpp'
+      - '.github/workflows/windows-sentinel-ci.yml'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'src/libsync/killswitch/**'
+      - 'src/gui/killswitch/**'
+      - 'test/testkillswitch.cpp'
+      - '.github/workflows/windows-sentinel-ci.yml'
+  workflow_dispatch:
+    inputs:
+      run_all_tests:
+        description: 'Run all tests (not just Kill Switch)'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: windows-sentinel-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  CRAFT_TARGET: windows-msvc2022_64-cl
+  CRAFT_MASTER_LOCATION: ${{ github.workspace }}\CraftMaster
+  CRAFT_MASTER_CONFIG: ${{ github.workspace }}\craftmaster.ini
+
+jobs:
+  build-and-test:
+    name: Build & Test Kill Switch
+    runs-on: windows-2022
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache Craft dependencies
+        id: cache-craft
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ github.workspace }}\CraftMaster
+            ${{ github.workspace }}\windows-msvc2022_64-cl
+          key: craft-windows-${{ runner.os }}-${{ hashFiles('.github/workflows/windows-sentinel-ci.yml') }}
+          restore-keys: |
+            craft-windows-${{ runner.os }}-
+
+      - name: Install Craft Master
+        if: steps.cache-craft.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          Write-Host "::group::Clone CraftMaster"
+          git clone -q --depth=1 https://invent.kde.org/packaging/craftmaster.git "${{ env.CRAFT_MASTER_LOCATION }}"
+          Write-Host "::endgroup::"
+
+      - name: Setup Craft function
+        id: craft-setup
+        shell: pwsh
+        run: |
+          # Create craftmaster.ini if it doesn't exist
+          if (-not (Test-Path "${{ env.CRAFT_MASTER_CONFIG }}")) {
+            @"
+          [General]
+          Branch = master
+          ShallowClone = True
+
+          [windows-msvc2022_64-cl]
+          QtVersion = 6.8
+          ABI = msvc2022_64
+          Compiler = cl
+          "@ | Out-File -FilePath "${{ env.CRAFT_MASTER_CONFIG }}" -Encoding utf8
+          }
+
+          # Output craft command for reuse
+          echo "CRAFT_CMD=python `"${{ env.CRAFT_MASTER_LOCATION }}\CraftMaster.py`" --config `"${{ env.CRAFT_MASTER_CONFIG }}`" --target ${{ env.CRAFT_TARGET }} -c" >> $env:GITHUB_OUTPUT
+
+      - name: Install Nextcloud Client dependencies
+        if: steps.cache-craft.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          function craft() {
+              python "${{ env.CRAFT_MASTER_LOCATION }}\CraftMaster.py" --config "${{ env.CRAFT_MASTER_CONFIG }}" --target ${{ env.CRAFT_TARGET }} -c $args
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+          Write-Host "::group::Add blueprint repositories"
+          craft --add-blueprint-repository "https://github.com/nextcloud/craft-blueprints-kde.git|stable-4.0|"
+          craft --add-blueprint-repository "https://github.com/nextcloud/desktop-client-blueprints.git|stable-4.0|"
+          Write-Host "::endgroup::"
+
+          Write-Host "::group::Install Craft"
+          craft craft
+          Write-Host "::endgroup::"
+
+          Write-Host "::group::Install dependencies"
+          craft --install-deps nextcloud-client
+          Write-Host "::endgroup::"
+
+      - name: Setup PATH
+        shell: pwsh
+        run: |
+          echo "${{ github.workspace }}\${{ env.CRAFT_TARGET }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build Nextcloud Sentinel
+        shell: pwsh
+        run: |
+          function craft() {
+              python "${{ env.CRAFT_MASTER_LOCATION }}\CraftMaster.py" --config "${{ env.CRAFT_MASTER_CONFIG }}" --target ${{ env.CRAFT_TARGET }} -c $args
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+          Write-Host "::group::Compile Nextcloud Sentinel"
+          craft --src-dir "${{ github.workspace }}" nextcloud-client
+          Write-Host "::endgroup::"
+
+      - name: Run Kill Switch tests
+        shell: pwsh
+        run: |
+          $buildFolder = "${{ github.workspace }}\${{ env.CRAFT_TARGET }}\build\nextcloud-client\work\build"
+
+          Write-Host "Build folder: $buildFolder"
+
+          if (-not (Test-Path $buildFolder)) {
+              Write-Error "Build folder not found!"
+              exit 1
+          }
+
+          cd $buildFolder
+
+          Write-Host "::group::Run Kill Switch Tests"
+
+          # Run Kill Switch specific tests
+          ctest -R KillSwitch --output-on-failure --timeout 300
+          $killSwitchResult = $LASTEXITCODE
+
+          Write-Host "::endgroup::"
+
+          if ($killSwitchResult -ne 0) {
+              Write-Host "::error::Kill Switch tests failed!"
+              exit $killSwitchResult
+          }
+
+          Write-Host "Kill Switch tests passed successfully!"
+
+      - name: Run all tests
+        if: ${{ github.event.inputs.run_all_tests == 'true' || github.event_name == 'push' }}
+        shell: pwsh
+        run: |
+          $buildFolder = "${{ github.workspace }}\${{ env.CRAFT_TARGET }}\build\nextcloud-client\work\build"
+          cd $buildFolder
+
+          Write-Host "::group::Run All Tests"
+          ctest --output-on-failure --timeout 300
+          Write-Host "::endgroup::"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-windows
+          path: |
+            ${{ github.workspace }}\${{ env.CRAFT_TARGET }}\build\nextcloud-client\work\build\Testing\
+          retention-days: 7
+
+      - name: Check Kill Switch module files
+        shell: pwsh
+        run: |
+          Write-Host "::group::Kill Switch Module Structure"
+
+          $killSwitchDir = "${{ github.workspace }}\src\libsync\killswitch"
+          $guiDir = "${{ github.workspace }}\src\gui\killswitch"
+
+          Write-Host "Core module files:"
+          Get-ChildItem -Path $killSwitchDir -Recurse | ForEach-Object {
+              Write-Host "  $($_.FullName.Replace(${{ github.workspace }}, ''))"
+          }
+
+          Write-Host "`nGUI files:"
+          Get-ChildItem -Path $guiDir -Recurse | ForEach-Object {
+              Write-Host "  $($_.FullName.Replace(${{ github.workspace }}, ''))"
+          }
+
+          Write-Host "::endgroup::"
+
+  # Static analysis job for Kill Switch code
+  static-analysis:
+    name: Static Analysis
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check Kill Switch code style
+        shell: pwsh
+        run: |
+          $files = @(
+              "src/libsync/killswitch/killswitchmanager.cpp",
+              "src/libsync/killswitch/killswitchmanager.h",
+              "src/libsync/killswitch/threatdetector.h",
+              "src/libsync/killswitch/detectors/massdeletedetector.cpp",
+              "src/libsync/killswitch/detectors/entropydetector.cpp",
+              "src/libsync/killswitch/detectors/canarydetector.cpp",
+              "src/gui/killswitch/killswitchsettings.cpp",
+              "src/gui/killswitch/killswitchalertdialog.cpp",
+              "test/testkillswitch.cpp"
+          )
+
+          $errors = @()
+
+          foreach ($file in $files) {
+              $path = Join-Path ${{ github.workspace }} $file
+              if (Test-Path $path) {
+                  Write-Host "Checking: $file"
+
+                  $content = Get-Content $path -Raw
+
+                  # Check for common issues
+                  if ($content -match "TODO|FIXME|HACK") {
+                      Write-Host "::warning file=$file::Contains TODO/FIXME/HACK comments"
+                  }
+
+                  # Check for proper license header
+                  if (-not ($content -match "SPDX-License-Identifier")) {
+                      $errors += "Missing SPDX license header in $file"
+                  }
+              } else {
+                  Write-Host "::warning::File not found: $file"
+              }
+          }
+
+          if ($errors.Count -gt 0) {
+              foreach ($error in $errors) {
+                  Write-Host "::error::$error"
+              }
+              exit 1
+          }
+
+          Write-Host "Static analysis passed!"
+
+  # Summary job
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [build-and-test, static-analysis]
+    if: always()
+
+    steps:
+      - name: Check results
+        run: |
+          if [ "${{ needs.build-and-test.result }}" == "success" ] && [ "${{ needs.static-analysis.result }}" == "success" ]; then
+            echo "::notice::All Sentinel CI checks passed!"
+            exit 0
+          else
+            echo "::error::Some checks failed. Build: ${{ needs.build-and-test.result }}, Analysis: ${{ needs.static-analysis.result }}"
+            exit 1
+          fi
