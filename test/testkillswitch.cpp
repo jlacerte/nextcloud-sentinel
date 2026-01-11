@@ -12,6 +12,7 @@
 #include "libsync/killswitch/detectors/massdeletedetector.h"
 #include "libsync/killswitch/detectors/entropydetector.h"
 #include "libsync/killswitch/detectors/canarydetector.h"
+#include "libsync/killswitch/detectors/patterndetector.h"
 #include "libsync/syncfileitem.h"
 
 using namespace OCC;
@@ -382,6 +383,220 @@ private slots:
 
         // Should be exactly 8.0 bits
         QVERIFY(qAbs(entropy - 8.0) < 0.001);
+    }
+
+    // ==================== PatternDetector Tests ====================
+
+    void testPatternDetectorCreation()
+    {
+        PatternDetector detector;
+        QCOMPARE(detector.name(), QString("PatternDetector"));
+        QVERIFY(detector.isEnabled());
+    }
+
+    void testPatternDetectorRansomwareExtensions()
+    {
+        PatternDetector detector;
+
+        // Common ransomware extensions
+        QVERIFY(detector.hasRansomwareExtension("document.locked"));
+        QVERIFY(detector.hasRansomwareExtension("file.encrypted"));
+        QVERIFY(detector.hasRansomwareExtension("photo.cry"));
+        QVERIFY(detector.hasRansomwareExtension("data.wannacry"));
+        QVERIFY(detector.hasRansomwareExtension("backup.locky"));
+        QVERIFY(detector.hasRansomwareExtension("report.cerber"));
+        QVERIFY(detector.hasRansomwareExtension("spreadsheet.conti"));
+        QVERIFY(detector.hasRansomwareExtension("document.ryuk"));
+
+        // STOP/Djvu family
+        QVERIFY(detector.hasRansomwareExtension("file.stop"));
+        QVERIFY(detector.hasRansomwareExtension("file.djvu"));
+
+        // Normal extensions - should NOT match
+        QVERIFY(!detector.hasRansomwareExtension("document.pdf"));
+        QVERIFY(!detector.hasRansomwareExtension("image.jpg"));
+        QVERIFY(!detector.hasRansomwareExtension("video.mp4"));
+        QVERIFY(!detector.hasRansomwareExtension("code.cpp"));
+        QVERIFY(!detector.hasRansomwareExtension("archive.zip"));
+    }
+
+    void testPatternDetectorRansomNotes()
+    {
+        PatternDetector detector;
+
+        // Common ransom note names
+        QVERIFY(detector.isRansomNote("README.txt"));
+        QVERIFY(detector.isRansomNote("readme.txt"));
+        QVERIFY(detector.isRansomNote("HOW_TO_DECRYPT.txt"));
+        QVERIFY(detector.isRansomNote("How-to-restore.txt"));
+        QVERIFY(detector.isRansomNote("DECRYPT_INSTRUCTIONS.txt"));
+        QVERIFY(detector.isRansomNote("_readme_.txt"));
+        QVERIFY(detector.isRansomNote("!README!.txt"));
+        QVERIFY(detector.isRansomNote("RESTORE-MY-FILES.txt"));
+
+        // Normal files - should NOT match
+        QVERIFY(!detector.isRansomNote("document.txt"));
+        QVERIFY(!detector.isRansomNote("notes.txt"));
+        QVERIFY(!detector.isRansomNote("readme_project.txt"));
+        QVERIFY(!detector.isRansomNote("config.txt"));
+    }
+
+    void testPatternDetectorDoubleExtension()
+    {
+        PatternDetector detector;
+
+        // Suspicious double extensions
+        QVERIFY(detector.hasDoubleExtension("document.pdf.locked"));
+        QVERIFY(detector.hasDoubleExtension("report.docx.encrypted"));
+        QVERIFY(detector.hasDoubleExtension("image.jpg.cry"));
+        QVERIFY(detector.hasDoubleExtension("data.xlsx.wannacry"));
+        QVERIFY(detector.hasDoubleExtension("backup.zip.cerber"));
+
+        // Normal files - should NOT match
+        QVERIFY(!detector.hasDoubleExtension("document.pdf"));
+        QVERIFY(!detector.hasDoubleExtension("archive.tar.gz")); // tar.gz is normal
+        QVERIFY(!detector.hasDoubleExtension("file.backup.txt")); // Not ransomware ext
+        QVERIFY(!detector.hasDoubleExtension("simple.locked")); // No normal ext before
+    }
+
+    void testPatternDetectorCriticalOnRansomNote()
+    {
+        PatternDetector detector;
+
+        SyncFileItem item;
+        item._instruction = CSYNC_INSTRUCTION_NEW;
+        item._file = "HOW_TO_DECRYPT.txt";
+
+        QVector<KillSwitchManager::Event> events;
+        ThreatInfo result = detector.analyze(item, events);
+
+        QCOMPARE(result.level, ThreatLevel::Critical);
+        QVERIFY(result.description.contains("Ransom note"));
+    }
+
+    void testPatternDetectorLowThreatSingleFile()
+    {
+        PatternDetector detector;
+        detector.setThreshold(3);
+
+        SyncFileItem item;
+        item._instruction = CSYNC_INSTRUCTION_NEW;
+        item._file = "document.locked";
+
+        QVector<KillSwitchManager::Event> events;
+        ThreatInfo result = detector.analyze(item, events);
+
+        // Single suspicious file = Low threat
+        QCOMPARE(result.level, ThreatLevel::Low);
+    }
+
+    void testPatternDetectorHighThreatMultipleFiles()
+    {
+        PatternDetector detector;
+        detector.setThreshold(3);
+
+        SyncFileItem item;
+        item._instruction = CSYNC_INSTRUCTION_NEW;
+        item._file = "document4.locked";
+
+        // Simulate 3 previous suspicious files
+        QVector<KillSwitchManager::Event> events;
+        events.append({QDateTime::currentDateTime(), "CREATE", "document1.locked"});
+        events.append({QDateTime::currentDateTime(), "CREATE", "document2.locked"});
+        events.append({QDateTime::currentDateTime(), "CREATE", "document3.locked"});
+
+        ThreatInfo result = detector.analyze(item, events);
+
+        // 4 suspicious files >= threshold = High threat
+        QVERIFY(result.level >= ThreatLevel::High);
+    }
+
+    void testPatternDetectorIgnoresNormalFiles()
+    {
+        PatternDetector detector;
+
+        SyncFileItem item;
+        item._instruction = CSYNC_INSTRUCTION_NEW;
+        item._file = "document.pdf";
+
+        QVector<KillSwitchManager::Event> events;
+        ThreatInfo result = detector.analyze(item, events);
+
+        QCOMPARE(result.level, ThreatLevel::None);
+    }
+
+    void testPatternDetectorIgnoresDeleteOperations()
+    {
+        PatternDetector detector;
+
+        SyncFileItem item;
+        item._instruction = CSYNC_INSTRUCTION_REMOVE;
+        item._file = "document.locked";
+
+        QVector<KillSwitchManager::Event> events;
+        ThreatInfo result = detector.analyze(item, events);
+
+        // Delete of suspicious file is not a threat (cleanup is OK)
+        QCOMPARE(result.level, ThreatLevel::None);
+    }
+
+    void testPatternDetectorMediumThreatDoubleExtension()
+    {
+        PatternDetector detector;
+        detector.setThreshold(5); // High threshold so single file doesn't reach High
+
+        SyncFileItem item;
+        item._instruction = CSYNC_INSTRUCTION_NEW;
+        item._file = "important_document.pdf.locked";
+
+        QVector<KillSwitchManager::Event> events;
+        ThreatInfo result = detector.analyze(item, events);
+
+        // Double extension = Medium threat
+        QCOMPARE(result.level, ThreatLevel::Medium);
+    }
+
+    void testPatternDetectorAddCustomExtension()
+    {
+        PatternDetector detector;
+
+        // Custom extension should not match initially
+        QVERIFY(!detector.hasRansomwareExtension("file.myransomware"));
+
+        // Add custom extension
+        detector.addCustomExtension(".myransomware");
+
+        // Now it should match
+        QVERIFY(detector.hasRansomwareExtension("file.myransomware"));
+    }
+
+    void testPatternDetectorCaseSensitivity()
+    {
+        PatternDetector detector;
+
+        // Extensions should be case-insensitive
+        QVERIFY(detector.hasRansomwareExtension("file.LOCKED"));
+        QVERIFY(detector.hasRansomwareExtension("file.Encrypted"));
+        QVERIFY(detector.hasRansomwareExtension("file.WANNACRY"));
+
+        // Ransom notes should be case-insensitive
+        QVERIFY(detector.isRansomNote("README.TXT"));
+        QVERIFY(detector.isRansomNote("How_To_Decrypt.TXT"));
+    }
+
+    void testPatternDetectorFullIntegration()
+    {
+        auto patternDetector = std::make_shared<PatternDetector>();
+        _manager->registerDetector(patternDetector);
+
+        SyncFileItem item;
+        item._instruction = CSYNC_INSTRUCTION_NEW;
+        item._file = "HOW_TO_DECRYPT.txt";
+
+        bool blocked = _manager->analyzeItem(item);
+
+        QVERIFY(blocked);
+        QVERIFY(_manager->isTriggered());
     }
 
     // ==================== Integration Tests ====================

@@ -43,6 +43,7 @@
 #include "libsync/killswitch/detectors/massdeletedetector.h"
 #include "libsync/killswitch/detectors/entropydetector.h"
 #include "libsync/killswitch/detectors/canarydetector.h"
+#include "libsync/killswitch/detectors/patterndetector.h"
 
 #include "config.h"
 
@@ -504,7 +505,8 @@ void Application::setupAccountsAndFolders()
     killSwitch->registerDetector(std::make_shared<MassDeleteDetector>());
     killSwitch->registerDetector(std::make_shared<EntropyDetector>());
     killSwitch->registerDetector(std::make_shared<CanaryDetector>());
-    qCInfo(lcApplication) << "Kill Switch protection initialized with 3 detectors";
+    killSwitch->registerDetector(std::make_shared<PatternDetector>());
+    qCInfo(lcApplication) << "Kill Switch protection initialized with 4 detectors";
 
     ConfigFile configFile;
     configFile.setMigrationPhase(ConfigFile::MigrationPhase::SetupUsers);

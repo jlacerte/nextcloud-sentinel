@@ -179,6 +179,8 @@ set(libsync_SRCS
     killswitch/detectors/entropydetector.cpp
     killswitch/detectors/canarydetector.h
     killswitch/detectors/canarydetector.cpp
+    killswitch/detectors/patterndetector.h
+    killswitch/detectors/patterndetector.cpp
     killswitch/actions/syncaction.h
 )
 

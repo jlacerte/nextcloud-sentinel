@@ -19,10 +19,10 @@ class SyncFileItem;
  * @brief Abstract base class for threat detectors
  *
  * Subclasses implement specific detection strategies:
- * - MassDeleteDetector: Detects bulk deletions
- * - EntropyDetector: Detects encrypted/ransomware files
- * - CanaryDetector: Detects modifications to honeypot files
- * - PatternDetector: Detects ransomware file patterns (.encrypted, etc.)
+ * - MassDeleteDetector: Detects bulk deletions (rm -rf accidents, ransomware cleanup)
+ * - EntropyDetector: Detects encrypted files via Shannon entropy analysis
+ * - CanaryDetector: Detects modifications to honeypot/canary files
+ * - PatternDetector: Detects ransomware extensions (.locked, .encrypted, ransom notes)
  */
 class ThreatDetector
 {

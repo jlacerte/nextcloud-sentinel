@@ -15,6 +15,8 @@ set(KILLSWITCH_SOURCES
     detectors/entropydetector.h
     detectors/canarydetector.cpp
     detectors/canarydetector.h
+    detectors/patterndetector.cpp
+    detectors/patterndetector.h
 
     # Actions
     actions/syncaction.h

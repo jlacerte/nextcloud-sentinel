@@ -29,6 +29,7 @@
 #include "killswitch/detectors/massdeletedetector.h"
 #include "killswitch/detectors/entropydetector.h"
 #include "killswitch/detectors/canarydetector.h"
+#include "killswitch/detectors/patterndetector.h"
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -114,6 +115,7 @@ SyncEngine::SyncEngine(AccountPtr account,
     _killSwitchManager->registerDetector(std::make_shared<MassDeleteDetector>());
     _killSwitchManager->registerDetector(std::make_shared<EntropyDetector>());
     _killSwitchManager->registerDetector(std::make_shared<CanaryDetector>());
+    _killSwitchManager->registerDetector(std::make_shared<PatternDetector>());
 
     // Connect kill switch signals
     connect(_killSwitchManager.data(), &KillSwitchManager::syncPaused,
