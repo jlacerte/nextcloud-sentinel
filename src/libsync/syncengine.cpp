@@ -111,11 +111,15 @@ SyncEngine::SyncEngine(AccountPtr account,
     // Nextcloud Sentinel - Initialize Kill Switch Manager
     _killSwitchManager.reset(new KillSwitchManager(this));
 
-    // Register threat detectors
+    // Register threat detectors - order optimized for performance:
+    // 1. PatternDetector - regex only, no file I/O (fastest)
+    // 2. CanaryDetector - path comparison only
+    // 3. MassDeleteDetector - event counting
+    // 4. EntropyDetector - reads file content (slowest)
+    _killSwitchManager->registerDetector(std::make_shared<PatternDetector>());
+    _killSwitchManager->registerDetector(std::make_shared<CanaryDetector>());
     _killSwitchManager->registerDetector(std::make_shared<MassDeleteDetector>());
     _killSwitchManager->registerDetector(std::make_shared<EntropyDetector>());
-    _killSwitchManager->registerDetector(std::make_shared<CanaryDetector>());
-    _killSwitchManager->registerDetector(std::make_shared<PatternDetector>());
 
     // Connect kill switch signals
     connect(_killSwitchManager.data(), &KillSwitchManager::syncPaused,

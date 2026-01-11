@@ -117,7 +117,7 @@ void PatternDetector::initializePatterns()
         QStringLiteral(".ttt"),
         QStringLiteral(".wallet"),
         QStringLiteral(".arena"),
-        QStringLiteral(".java"),  // Java ransomware, not Java files
+        // Note: .java removed - too many false positives for Java developers
         QStringLiteral(".onion"),
         QStringLiteral(".btc"),
         QStringLiteral(".nochance"),
@@ -158,6 +158,11 @@ void PatternDetector::initializePatterns()
         QRegularExpression(QStringLiteral("restore-my-files\\.txt$"), QRegularExpression::CaseInsensitiveOption),
         // Conti specific
         QRegularExpression(QStringLiteral("readme\\.conti\\.txt$"), QRegularExpression::CaseInsensitiveOption),
+        // HTA (HTML Application) ransom notes - used by some ransomware families
+        QRegularExpression(QStringLiteral("^how[_\\-\\s]?to[_\\-\\s]?decrypt.*\\.hta$"), QRegularExpression::CaseInsensitiveOption),
+        QRegularExpression(QStringLiteral("^how[_\\-\\s]?to[_\\-\\s]?restore.*\\.hta$"), QRegularExpression::CaseInsensitiveOption),
+        QRegularExpression(QStringLiteral("^decrypt[_\\-]?instructions.*\\.hta$"), QRegularExpression::CaseInsensitiveOption),
+        QRegularExpression(QStringLiteral("^read[_\\-\\s]?me.*\\.hta$"), QRegularExpression::CaseInsensitiveOption),
     };
 
     // Normal file extensions (for double extension detection)

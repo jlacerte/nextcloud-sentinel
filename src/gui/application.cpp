@@ -502,10 +502,15 @@ void Application::setupAccountsAndFolders()
 
     // Initialize Kill Switch protection
     auto *killSwitch = new KillSwitchManager(_folderManager.data());
+    // Order optimized for performance:
+    // 1. PatternDetector - regex only, no file I/O (fastest)
+    // 2. CanaryDetector - path comparison only
+    // 3. MassDeleteDetector - event counting
+    // 4. EntropyDetector - reads file content (slowest)
+    killSwitch->registerDetector(std::make_shared<PatternDetector>());
+    killSwitch->registerDetector(std::make_shared<CanaryDetector>());
     killSwitch->registerDetector(std::make_shared<MassDeleteDetector>());
     killSwitch->registerDetector(std::make_shared<EntropyDetector>());
-    killSwitch->registerDetector(std::make_shared<CanaryDetector>());
-    killSwitch->registerDetector(std::make_shared<PatternDetector>());
     qCInfo(lcApplication) << "Kill Switch protection initialized with 4 detectors";
 
     ConfigFile configFile;
