@@ -32,6 +32,8 @@ set(client_UI_SRCS
     folderwizardsourcepage.ui
     folderwizardtargetpage.ui
     generalsettings.ui
+    killswitch/killswitchsettings.ui
+    killswitch/killswitchalertdialog.ui
     legalnotice.ui
     ignorelisteditor.ui
     ignorelisttablewidget.ui
@@ -105,6 +107,10 @@ set(client_SRCS
     folderwizard.cpp
     generalsettings.h
     generalsettings.cpp
+    killswitch/killswitchsettings.h
+    killswitch/killswitchsettings.cpp
+    killswitch/killswitchalertdialog.h
+    killswitch/killswitchalertdialog.cpp
     legalnotice.h
     legalnotice.cpp
     ignorelisteditor.h

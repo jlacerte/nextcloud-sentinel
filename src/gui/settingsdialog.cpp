@@ -17,6 +17,9 @@
 #include "owncloudgui.h"
 #include "accountmanager.h"
 
+// Nextcloud Sentinel - Kill Switch
+#include "killswitch/killswitchsettings.h"
+
 #include <QLabel>
 #include <QStandardItemModel>
 #include <QStackedWidget>
@@ -127,6 +130,15 @@ SettingsDialog::SettingsDialog(ownCloudGui *gui, QWidget *parent)
 #endif
 
     _actionGroupWidgets.insert(generalAction, generalSettings);
+
+    // Nextcloud Sentinel - Kill Switch Settings
+    QAction *killSwitchAction = createColorAwareAction(QLatin1String(":/client/theme/shield.svg"), tr("Kill Switch"));
+    _actionGroup->addAction(killSwitchAction);
+    _toolBar->addAction(killSwitchAction);
+    auto *killSwitchSettings = new KillSwitchSettings;
+    _ui->stack->addWidget(killSwitchSettings);
+    connect(this, &SettingsDialog::styleChanged, killSwitchSettings, &KillSwitchSettings::slotStyleChanged);
+    _actionGroupWidgets.insert(killSwitchAction, killSwitchSettings);
 
     const auto accountsList = AccountManager::instance()->accounts();
     for (const auto &account : accountsList) {
