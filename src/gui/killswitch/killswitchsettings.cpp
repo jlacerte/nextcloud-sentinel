@@ -12,9 +12,16 @@
 #include "libsync/configfile.h"
 #include "theme.h"
 
+#include <QCheckBox>
+#include <QSpinBox>
+#include <QDoubleSpinBox>
+#include <QPushButton>
+#include <QListWidget>
+#include <QListWidgetItem>
 #include <QMessageBox>
 #include <QInputDialog>
 #include <QDateTime>
+#include <QLoggingCategory>
 
 namespace OCC {
 

@@ -12,6 +12,8 @@
 
 #include <QStyle>
 #include <QApplication>
+#include <QListWidget>
+#include <QListWidgetItem>
 
 namespace OCC {
 

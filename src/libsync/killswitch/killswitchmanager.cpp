@@ -11,6 +11,7 @@
 #include "syncfileitem.h"
 #include "logger.h"
 
+#include <QLoggingCategory>
 #include <QMutexLocker>
 #include <algorithm>
 

@@ -187,17 +187,17 @@ ThreatInfo EntropyDetector::analyze(const SyncFileItem &item,
     // Check if entropy is suspicious
     if (entropy >= m_highThreshold) {
         result.level = ThreatLevel::Critical;
-        result.description = QStringLiteral("Critical entropy: %.3f bits/byte (file: %1)")
-                                 .arg(item._file)
-                                 .arg(entropy);
+        result.description = QStringLiteral("Critical entropy: %1 bits/byte (file: %2)")
+                                 .arg(entropy, 0, 'f', 3)
+                                 .arg(item._file);
         result.affectedFiles.append(item._file);
     } else if (entropy >= m_suspiciousThreshold && entropy > expectedRange.second) {
         result.level = ThreatLevel::High;
-        result.description = QStringLiteral("Suspicious entropy: %.3f (expected: %.1f-%.1f) for %1")
-                                 .arg(item._file)
-                                 .arg(entropy)
-                                 .arg(expectedRange.first)
-                                 .arg(expectedRange.second);
+        result.description = QStringLiteral("Suspicious entropy: %1 (expected: %2-%3) for %4")
+                                 .arg(entropy, 0, 'f', 3)
+                                 .arg(expectedRange.first, 0, 'f', 1)
+                                 .arg(expectedRange.second, 0, 'f', 1)
+                                 .arg(item._file);
         result.affectedFiles.append(item._file);
     } else if (m_entropyCache.contains(item._file)) {
         // Check for sudden entropy increase (ransomware encryption)
@@ -206,11 +206,11 @@ ThreatInfo EntropyDetector::analyze(const SyncFileItem &item,
 
         if (increase > 2.0 && entropy > 7.0) {
             result.level = ThreatLevel::High;
-            result.description = QStringLiteral("Entropy spike: %.1f -> %.1f (delta: +%.1f) for %1")
-                                     .arg(item._file)
-                                     .arg(oldEntropy)
-                                     .arg(entropy)
-                                     .arg(increase);
+            result.description = QStringLiteral("Entropy spike: %1 -> %2 (delta: +%3) for %4")
+                                     .arg(oldEntropy, 0, 'f', 1)
+                                     .arg(entropy, 0, 'f', 1)
+                                     .arg(increase, 0, 'f', 1)
+                                     .arg(item._file);
             result.affectedFiles.append(item._file);
         }
     }
