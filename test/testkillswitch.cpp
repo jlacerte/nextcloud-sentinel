@@ -1000,6 +1000,169 @@ private slots:
         QVERIFY(blocked);
         QVERIFY(_manager->isTriggered());
     }
+
+    // ==================== MassDeleteDetector Whitelist Tests ====================
+
+    void testMassDelete_WhitelistNodeModules()
+    {
+        MassDeleteDetector detector;
+
+        // Paths inside node_modules should be whitelisted
+        QVERIFY(detector.isWhitelisted("project/node_modules/lodash/index.js"));
+        QVERIFY(detector.isWhitelisted("node_modules/react/package.json"));
+        QVERIFY(detector.isWhitelisted("src/node_modules/lib.js"));
+    }
+
+    void testMassDelete_WhitelistBuildDirs()
+    {
+        MassDeleteDetector detector;
+
+        // Build directories should be whitelisted
+        QVERIFY(detector.isWhitelisted("project/build/output.js"));
+        QVERIFY(detector.isWhitelisted("dist/bundle.min.js"));
+        QVERIFY(detector.isWhitelisted("target/classes/Main.class"));
+    }
+
+    void testMassDelete_WhitelistGitDir()
+    {
+        MassDeleteDetector detector;
+
+        // .git directories should be whitelisted
+        QVERIFY(detector.isWhitelisted(".git/objects/pack/abc123"));
+        QVERIFY(detector.isWhitelisted("project/.git/HEAD"));
+    }
+
+    void testMassDelete_WhitelistPythonCache()
+    {
+        MassDeleteDetector detector;
+
+        // Python caches should be whitelisted
+        QVERIFY(detector.isWhitelisted("src/__pycache__/module.cpython-39.pyc"));
+        QVERIFY(detector.isWhitelisted(".pytest_cache/v/cache/nodeids"));
+        QVERIFY(detector.isWhitelisted("venv/lib/python3.9/site-packages/pkg.py"));
+    }
+
+    void testMassDelete_NotWhitelisted()
+    {
+        MassDeleteDetector detector;
+
+        // Regular files should NOT be whitelisted
+        QVERIFY(!detector.isWhitelisted("src/main.cpp"));
+        QVERIFY(!detector.isWhitelisted("documents/report.pdf"));
+        QVERIFY(!detector.isWhitelisted("photos/vacation.jpg"));
+        QVERIFY(!detector.isWhitelisted("config.json"));
+    }
+
+    void testMassDelete_CustomWhitelist()
+    {
+        MassDeleteDetector detector;
+
+        // Add custom whitelist
+        detector.addWhitelistedDirectory("my_temp_folder");
+
+        QVERIFY(detector.isWhitelisted("project/my_temp_folder/data.txt"));
+        QVERIFY(!detector.isWhitelisted("project/important_folder/data.txt"));
+    }
+
+    void testMassDelete_WhitelistCaseInsensitive()
+    {
+        MassDeleteDetector detector;
+
+        // Whitelist should be case-insensitive
+        QVERIFY(detector.isWhitelisted("project/NODE_MODULES/pkg/index.js"));
+        QVERIFY(detector.isWhitelisted("project/Build/output.exe"));
+        QVERIFY(detector.isWhitelisted("project/.GIT/config"));
+    }
+
+    void testMassDelete_WhitelistedNotCounted()
+    {
+        MassDeleteDetector detector;
+        detector.setThreshold(5);
+
+        SyncFileItem item;
+        item._instruction = CSYNC_INSTRUCTION_REMOVE;
+        item._file = "project/node_modules/pkg/file.js";
+
+        // 10 deletions but all in node_modules
+        QVector<KillSwitchManager::Event> events;
+        for (int i = 0; i < 10; i++) {
+            events.append({
+                QDateTime::currentDateTime(),
+                "DELETE",
+                QString("project/node_modules/pkg%1/index.js").arg(i)
+            });
+        }
+
+        ThreatInfo result = detector.analyze(item, events);
+
+        // Should not trigger because all paths are whitelisted
+        QCOMPARE(result.level, ThreatLevel::None);
+    }
+
+    void testMassDelete_MixedWhitelistedAndNot()
+    {
+        MassDeleteDetector detector;
+        detector.setThreshold(5);
+
+        SyncFileItem item;
+        item._instruction = CSYNC_INSTRUCTION_REMOVE;
+        item._file = "src/important.cpp";
+
+        // 3 whitelisted + 6 non-whitelisted = should trigger (6 >= 5)
+        QVector<KillSwitchManager::Event> events;
+        for (int i = 0; i < 3; i++) {
+            events.append({
+                QDateTime::currentDateTime(),
+                "DELETE",
+                QString("project/node_modules/pkg%1/index.js").arg(i)
+            });
+        }
+        for (int i = 0; i < 6; i++) {
+            events.append({
+                QDateTime::currentDateTime(),
+                "DELETE",
+                QString("src/file%1.cpp").arg(i)
+            });
+        }
+
+        ThreatInfo result = detector.analyze(item, events);
+
+        // Should trigger because 6 non-whitelisted files >= threshold of 5
+        QVERIFY(result.level >= ThreatLevel::High);
+    }
+
+    void testMassDelete_TreeDeletionDetection()
+    {
+        MassDeleteDetector detector;
+
+        // All files under same directory = tree deletion
+        QStringList paths = {
+            "project/src/module/file1.cpp",
+            "project/src/module/file2.cpp",
+            "project/src/module/subdir/file3.cpp",
+            "project/src/module/subdir/file4.cpp",
+            "project/src/module/other/file5.cpp"
+        };
+
+        QString treeRoot = detector.detectTreeDeletion(paths);
+        QVERIFY(!treeRoot.isEmpty());
+        QVERIFY(treeRoot.contains("module") || treeRoot.contains("src"));
+    }
+
+    void testMassDelete_NoTreeDeletion()
+    {
+        MassDeleteDetector detector;
+
+        // Files from different directories = no tree deletion
+        QStringList paths = {
+            "project1/file1.cpp",
+            "project2/file2.cpp",
+            "other/file3.cpp"
+        };
+
+        QString treeRoot = detector.detectTreeDeletion(paths);
+        QVERIFY(treeRoot.isEmpty());
+    }
 };
 
 QTEST_GUILESS_MAIN(TestKillSwitch)
