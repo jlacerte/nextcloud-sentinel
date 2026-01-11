@@ -11,7 +11,7 @@
 #include <QVector>
 #include <QTimer>
 #include <QDateTime>
-#include <QMutex>
+#include <QRecursiveMutex>
 #include <memory>
 
 namespace OCC {
@@ -182,7 +182,7 @@ private:
     // Event tracking
     QVector<Event> m_recentEvents;
     QTimer m_windowTimer;
-    QMutex m_mutex;
+    QRecursiveMutex m_mutex;
 
     // Configuration
     int m_deleteThreshold = 10;
