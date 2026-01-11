@@ -177,6 +177,11 @@ double EntropyDetector::calculateMultiBlockEntropy(const QString &filePath) cons
 
 void EntropyDetector::updateCache(const QString &filePath, double entropy) const
 {
+    // Skip caching if disabled
+    if (!m_cacheEnabled) {
+        return;
+    }
+
     // Remove from current position if exists
     int existingIndex = m_cacheOrder.indexOf(filePath);
     if (existingIndex >= 0) {
@@ -307,7 +312,7 @@ ThreatInfo EntropyDetector::analyze(const SyncFileItem &item,
                                  .arg(expectedRange.second, 0, 'f', 1)
                                  .arg(item._file);
         result.affectedFiles.append(item._file);
-    } else if (m_entropyCache.contains(item._file)) {
+    } else if (m_cacheEnabled && m_entropyCache.contains(item._file)) {
         // Check for sudden entropy increase (ransomware encryption)
         double oldEntropy = m_entropyCache[item._file];
         double increase = entropy - oldEntropy;

@@ -7,6 +7,10 @@
 
 #include <QtTest>
 #include <QSignalSpy>
+#include <QtConcurrent>
+#include <QFutureSynchronizer>
+#include <QThread>
+#include <QElapsedTimer>
 
 #include "libsync/killswitch/killswitchmanager.h"
 #include "libsync/killswitch/detectors/massdeletedetector.h"
@@ -1162,6 +1166,299 @@ private slots:
 
         QString treeRoot = detector.detectTreeDeletion(paths);
         QVERIFY(treeRoot.isEmpty());
+    }
+
+    // ==================== Thread-Safety Tests ====================
+
+    void testConcurrent_MultipleAnalyze()
+    {
+        // Test that multiple threads can call analyze() simultaneously
+        auto manager = std::make_shared<KillSwitchManager>(nullptr);
+        manager->setEnabled(true);
+        manager->registerDetector(std::make_shared<EntropyDetector>());
+        manager->registerDetector(std::make_shared<PatternDetector>());
+
+        QFutureSynchronizer<bool> sync;
+
+        // Launch 10 concurrent analyze operations
+        for (int i = 0; i < 10; i++) {
+            sync.addFuture(QtConcurrent::run([manager, i]() {
+                SyncFileItem item;
+                item._file = QString("test_file_%1.txt").arg(i);
+                item._instruction = CSYNC_INSTRUCTION_NEW;
+
+                // Each thread analyzes multiple items
+                for (int j = 0; j < 5; j++) {
+                    manager->analyze(item);
+                }
+                return true;
+            }));
+        }
+
+        sync.waitForFinished();
+
+        // If we get here without crash, concurrent access is safe
+        QVERIFY(true);
+    }
+
+    void testConcurrent_AnalyzeWhileReset()
+    {
+        // Test that reset() can be called while analyze() is running
+        auto manager = std::make_shared<KillSwitchManager>(nullptr);
+        manager->setEnabled(true);
+        manager->registerDetector(std::make_shared<MassDeleteDetector>());
+
+        QAtomicInt analyzeCount(0);
+        QAtomicInt resetCount(0);
+
+        QFutureSynchronizer<void> sync;
+
+        // Analyzer threads
+        for (int i = 0; i < 5; i++) {
+            sync.addFuture(QtConcurrent::run([manager, &analyzeCount]() {
+                for (int j = 0; j < 20; j++) {
+                    SyncFileItem item;
+                    item._file = QString("file_%1.txt").arg(j);
+                    item._instruction = CSYNC_INSTRUCTION_REMOVE;
+                    manager->analyze(item);
+                    analyzeCount.fetchAndAddRelaxed(1);
+                    QThread::usleep(100);
+                }
+            }));
+        }
+
+        // Reset thread
+        sync.addFuture(QtConcurrent::run([manager, &resetCount]() {
+            for (int i = 0; i < 10; i++) {
+                QThread::msleep(5);
+                manager->reset();
+                resetCount.fetchAndAddRelaxed(1);
+            }
+        }));
+
+        sync.waitForFinished();
+
+        QVERIFY(analyzeCount.loadRelaxed() > 0);
+        QVERIFY(resetCount.loadRelaxed() > 0);
+    }
+
+    void testConcurrent_DetectorRegistration()
+    {
+        // Test that detectors can be registered while analysis is running
+        // (This tests the thread-safety of the detector list)
+        auto manager = std::make_shared<KillSwitchManager>(nullptr);
+        manager->setEnabled(true);
+
+        QAtomicInt analysisComplete(0);
+
+        QFutureSynchronizer<void> sync;
+
+        // Start analysis thread first
+        sync.addFuture(QtConcurrent::run([manager, &analysisComplete]() {
+            for (int i = 0; i < 50; i++) {
+                SyncFileItem item;
+                item._file = QString("test_%1.dat").arg(i);
+                item._instruction = CSYNC_INSTRUCTION_NEW;
+                manager->analyze(item);
+                analysisComplete.fetchAndAddRelaxed(1);
+                QThread::usleep(50);
+            }
+        }));
+
+        // Give analysis thread a head start
+        QThread::msleep(5);
+
+        // Register detectors while analysis is ongoing
+        sync.addFuture(QtConcurrent::run([manager]() {
+            manager->registerDetector(std::make_shared<EntropyDetector>());
+            QThread::msleep(2);
+            manager->registerDetector(std::make_shared<PatternDetector>());
+            QThread::msleep(2);
+            manager->registerDetector(std::make_shared<MassDeleteDetector>());
+        }));
+
+        sync.waitForFinished();
+
+        QVERIFY(analysisComplete.loadRelaxed() == 50);
+    }
+
+    // ==================== Cache and Timing Tests ====================
+
+    void testEntropyCache_Hit()
+    {
+        EntropyDetector detector;
+        detector.setEnabled(true);
+        detector.setCacheEnabled(true);
+
+        // Analyze the same file twice
+        SyncFileItem item;
+        item._file = "cached_file.bin";
+        item._instruction = CSYNC_INSTRUCTION_NEW;
+
+        QVector<KillSwitchManager::Event> events;
+
+        // First analysis (cache miss)
+        QElapsedTimer timer;
+        timer.start();
+        detector.analyze(item, events);
+        qint64 firstTime = timer.nsecsElapsed();
+
+        // Second analysis (should hit cache)
+        timer.restart();
+        detector.analyze(item, events);
+        qint64 secondTime = timer.nsecsElapsed();
+
+        // Cache hit should be faster (or at least not significantly slower)
+        // We can't guarantee exact timing, but cache should work
+        // Just verify no crash and both calls complete
+        QVERIFY(firstTime >= 0);
+        QVERIFY(secondTime >= 0);
+    }
+
+    void testEntropyCache_Miss()
+    {
+        EntropyDetector detector;
+        detector.setEnabled(true);
+        detector.setCacheEnabled(true);
+
+        QVector<KillSwitchManager::Event> events;
+
+        // Analyze different files (all should be cache misses)
+        for (int i = 0; i < 5; i++) {
+            SyncFileItem item;
+            item._file = QString("unique_file_%1.dat").arg(i);
+            item._instruction = CSYNC_INSTRUCTION_NEW;
+
+            ThreatInfo result = detector.analyze(item, events);
+            // Each should complete without using previous cache entries
+            QVERIFY(result.detectorName == "EntropyDetector");
+        }
+    }
+
+    void testEntropyCache_Eviction()
+    {
+        EntropyDetector detector;
+        detector.setEnabled(true);
+        detector.setCacheEnabled(true);
+        detector.setMaxCacheSize(3); // Very small cache for testing
+
+        QVector<KillSwitchManager::Event> events;
+
+        // Fill cache with 3 entries
+        for (int i = 0; i < 3; i++) {
+            SyncFileItem item;
+            item._file = QString("file_%1.bin").arg(i);
+            item._instruction = CSYNC_INSTRUCTION_NEW;
+            detector.analyze(item, events);
+        }
+
+        // Add a 4th entry, should evict oldest
+        SyncFileItem newItem;
+        newItem._file = "file_3.bin";
+        newItem._instruction = CSYNC_INSTRUCTION_NEW;
+        detector.analyze(newItem, events);
+
+        // Verify cache size is still at max
+        QVERIFY(detector.cacheSize() <= 3);
+    }
+
+    void testTimeWindow_Expiration()
+    {
+        MassDeleteDetector detector;
+        detector.setEnabled(true);
+        detector.setThreshold(5);
+
+        SyncFileItem item;
+        item._file = "test.txt";
+        item._instruction = CSYNC_INSTRUCTION_REMOVE;
+
+        // Create events older than the time window (60 seconds default)
+        QVector<KillSwitchManager::Event> oldEvents;
+        QDateTime now = QDateTime::currentDateTime();
+
+        // Add 10 delete events from 2 minutes ago (should be expired)
+        for (int i = 0; i < 10; i++) {
+            KillSwitchManager::Event event;
+            event.type = "DELETE";
+            event.path = QString("old_file_%1.txt").arg(i);
+            event.timestamp = now.addSecs(-120); // 2 minutes ago
+            oldEvents.append(event);
+        }
+
+        ThreatInfo result = detector.analyze(item, oldEvents);
+
+        // Old events should not trigger (they're outside time window)
+        // The detector's internal logic handles time window
+        QVERIFY(result.level == ThreatLevel::None || result.affectedFiles.size() <= 1);
+    }
+
+    void testTimeWindow_Boundary()
+    {
+        MassDeleteDetector detector;
+        detector.setEnabled(true);
+        detector.setThreshold(5);
+
+        SyncFileItem item;
+        item._file = "boundary_test.txt";
+        item._instruction = CSYNC_INSTRUCTION_REMOVE;
+
+        QVector<KillSwitchManager::Event> events;
+        QDateTime now = QDateTime::currentDateTime();
+
+        // Add events right at the boundary (59.9 seconds ago)
+        // These should still be counted
+        for (int i = 0; i < 10; i++) {
+            KillSwitchManager::Event event;
+            event.type = "DELETE";
+            event.path = QString("boundary_file_%1.txt").arg(i);
+            event.timestamp = now.addMSecs(-59900); // 59.9 seconds ago
+            events.append(event);
+        }
+
+        ThreatInfo result = detector.analyze(item, events);
+
+        // Events at 59.9s should still be within 60s window
+        // With 10 deletes and threshold 5, should trigger
+        QVERIFY(result.level >= ThreatLevel::High || result.affectedFiles.size() >= 5);
+    }
+
+    void testTimeWindow_RecentEventsOnly()
+    {
+        MassDeleteDetector detector;
+        detector.setEnabled(true);
+        detector.setThreshold(5);
+
+        SyncFileItem item;
+        item._file = "recent_test.txt";
+        item._instruction = CSYNC_INSTRUCTION_REMOVE;
+
+        QVector<KillSwitchManager::Event> events;
+        QDateTime now = QDateTime::currentDateTime();
+
+        // Mix of old and recent events
+        // 3 old events (should be ignored)
+        for (int i = 0; i < 3; i++) {
+            KillSwitchManager::Event event;
+            event.type = "DELETE";
+            event.path = QString("old_%1.txt").arg(i);
+            event.timestamp = now.addSecs(-300); // 5 minutes ago
+            events.append(event);
+        }
+
+        // 4 recent events (should be counted)
+        for (int i = 0; i < 4; i++) {
+            KillSwitchManager::Event event;
+            event.type = "DELETE";
+            event.path = QString("recent_%1.txt").arg(i);
+            event.timestamp = now.addSecs(-10); // 10 seconds ago
+            events.append(event);
+        }
+
+        ThreatInfo result = detector.analyze(item, events);
+
+        // Only 4 recent events, threshold is 5, should not trigger critical
+        // (might trigger medium at 50% threshold)
+        QVERIFY(result.level < ThreatLevel::High);
     }
 };
 

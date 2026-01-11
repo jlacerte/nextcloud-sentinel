@@ -39,6 +39,14 @@ public:
     void setSuspiciousEntropyThreshold(double threshold) { m_suspiciousThreshold = threshold; }
     void setSampleSize(int bytes) { m_sampleSize = bytes; }
 
+    // Cache control
+    void setCacheEnabled(bool enabled) { m_cacheEnabled = enabled; }
+    bool isCacheEnabled() const { return m_cacheEnabled; }
+    void setMaxCacheSize(int size) { m_cacheMaxSize = size; }
+    int maxCacheSize() const { return m_cacheMaxSize; }
+    int cacheSize() const { return m_entropyCache.size(); }
+    void clearCache() { m_entropyCache.clear(); m_cacheOrder.clear(); }
+
     /**
      * @brief Calculate Shannon entropy of data
      * @param data The data to analyze
@@ -102,6 +110,7 @@ private:
     double m_suspiciousThreshold = 7.5; // Suspicious
     int m_sampleSize = 65536;           // 64KB sample per block
     int m_cacheMaxSize = 10000;         // LRU cache limit
+    bool m_cacheEnabled = true;         // Cache enabled by default
 
     // Cache of known file entropies for comparison (with LRU eviction)
     mutable QHash<QString, double> m_entropyCache;
