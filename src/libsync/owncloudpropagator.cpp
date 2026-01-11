@@ -24,6 +24,7 @@
 #include "discoveryphase.h"
 #include "syncfileitem.h"
 #include "foldermetadata.h"
+#include "killswitch/killswitchmanager.h"
 
 #ifdef Q_OS_WIN
 #include <windef.h>
@@ -343,6 +344,15 @@ void PropagateItemJob::reportClientStatuses()
 
 PropagateItemJob *OwncloudPropagator::createJob(const SyncFileItemPtr &item)
 {
+    // Kill Switch protection: analyze item before creating job
+    if (auto *killSwitch = KillSwitchManager::instance()) {
+        if (killSwitch->analyzeItem(*item)) {
+            // Threat detected - block this operation
+            qCWarning(lcPropagator) << "Kill Switch blocked operation on:" << item->_file;
+            return new PropagateIgnoreJob(this, item);
+        }
+    }
+
     bool deleteExisting = item->_instruction == CSYNC_INSTRUCTION_TYPE_CHANGE;
     switch (item->_instruction) {
     case CSYNC_INSTRUCTION_REMOVE:

@@ -38,6 +38,12 @@
 #include "csync_exclude.h"
 #include "common/vfs.h"
 
+// Kill Switch protection
+#include "libsync/killswitch/killswitchmanager.h"
+#include "libsync/killswitch/detectors/massdeletedetector.h"
+#include "libsync/killswitch/detectors/entropydetector.h"
+#include "libsync/killswitch/detectors/canarydetector.h"
+
 #include "config.h"
 
 #if defined(Q_OS_WIN)
@@ -492,6 +498,14 @@ Application::~Application()
 void Application::setupAccountsAndFolders()
 {
     _folderManager.reset(new FolderMan);
+
+    // Initialize Kill Switch protection
+    auto *killSwitch = new KillSwitchManager(_folderManager.data());
+    killSwitch->registerDetector(std::make_shared<MassDeleteDetector>());
+    killSwitch->registerDetector(std::make_shared<EntropyDetector>());
+    killSwitch->registerDetector(std::make_shared<CanaryDetector>());
+    qCInfo(lcApplication) << "Kill Switch protection initialized with 3 detectors";
+
     ConfigFile configFile;
     configFile.setMigrationPhase(ConfigFile::MigrationPhase::SetupUsers);
     const auto accountsRestoreResult = restoreLegacyAccount();
