@@ -1,0 +1,404 @@
+# SPDX-FileCopyrightText: 2026 Nextcloud Sentinel Project
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+name: Linux Sentinel CI
+
+on:
+  push:
+    branches:
+      - master
+      - 'sentinel-*'
+    paths:
+      - 'src/libsync/killswitch/**'
+      - 'src/gui/killswitch/**'
+      - 'test/testkillswitch.cpp'
+      - 'test/CMakeLists.txt'
+      - '.github/workflows/linux-sentinel-ci.yml'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'src/libsync/killswitch/**'
+      - 'src/gui/killswitch/**'
+      - 'test/testkillswitch.cpp'
+      - 'test/CMakeLists.txt'
+      - '.github/workflows/linux-sentinel-ci.yml'
+  workflow_dispatch:
+    inputs:
+      run_all_tests:
+        description: 'Run all tests (not just Kill Switch)'
+        required: false
+        default: false
+        type: boolean
+      compiler:
+        description: 'Compiler to use'
+        required: false
+        default: 'both'
+        type: choice
+        options:
+          - gcc
+          - clang
+          - both
+
+concurrency:
+  group: linux-sentinel-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build-gcc:
+    name: Build & Test (GCC)
+    if: ${{ github.event.inputs.compiler != 'clang' }}
+    runs-on: ubuntu-latest
+    container: ghcr.io/nextcloud/continuous-integration-client-qt6:client-trixie-6.8.2-2
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure CMake (GCC)
+        run: |
+          mkdir -p build-gcc
+          cd build-gcc
+          cmake .. -G Ninja \
+            -DCMAKE_C_COMPILER=gcc \
+            -DCMAKE_CXX_COMPILER=g++ \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DQT_MAJOR_VERSION=6 \
+            -DQUICK_COMPILER=ON \
+            -DBUILD_UPDATER=ON \
+            -DBUILD_TESTING=ON \
+            -DCMAKE_CXX_FLAGS="-Werror -Wall -Wextra -Wpedantic"
+
+      - name: Build
+        run: |
+          cd build-gcc
+          ninja
+
+      - name: Run Kill Switch tests
+        run: |
+          cd build-gcc
+          useradd -m -s /bin/bash testuser || true
+          chown -R testuser:testuser .
+
+          echo "::group::Kill Switch Tests"
+          su -c 'xvfb-run ctest -R KillSwitch --output-on-failure --timeout 300' testuser
+          echo "::endgroup::"
+
+      - name: Run all tests
+        if: ${{ github.event.inputs.run_all_tests == 'true' || github.event_name == 'push' }}
+        run: |
+          cd build-gcc
+          echo "::group::All Tests"
+          su -c 'xvfb-run ctest --output-on-failure --timeout 300' testuser
+          echo "::endgroup::"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-linux-gcc
+          path: build-gcc/Testing/
+          retention-days: 7
+
+  build-clang:
+    name: Build & Test (Clang)
+    if: ${{ github.event.inputs.compiler != 'gcc' }}
+    runs-on: ubuntu-latest
+    container: ghcr.io/nextcloud/continuous-integration-client-qt6:client-trixie-6.8.2-2
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure CMake (Clang)
+        run: |
+          mkdir -p build-clang
+          cd build-clang
+          cmake .. -G Ninja \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DQT_MAJOR_VERSION=6 \
+            -DQUICK_COMPILER=ON \
+            -DBUILD_UPDATER=ON \
+            -DBUILD_TESTING=ON \
+            -DCMAKE_CXX_FLAGS="-Werror -Wall -Wextra"
+
+      - name: Build
+        run: |
+          cd build-clang
+          ninja
+
+      - name: Run Kill Switch tests
+        run: |
+          cd build-clang
+          useradd -m -s /bin/bash testuser || true
+          chown -R testuser:testuser .
+
+          echo "::group::Kill Switch Tests"
+          su -c 'xvfb-run ctest -R KillSwitch --output-on-failure --timeout 300' testuser
+          echo "::endgroup::"
+
+      - name: Run all tests
+        if: ${{ github.event.inputs.run_all_tests == 'true' || github.event_name == 'push' }}
+        run: |
+          cd build-clang
+          echo "::group::All Tests"
+          su -c 'xvfb-run ctest --output-on-failure --timeout 300' testuser
+          echo "::endgroup::"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-linux-clang
+          path: build-clang/Testing/
+          retention-days: 7
+
+  # Code coverage job
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    container: ghcr.io/nextcloud/continuous-integration-client-qt6:client-trixie-6.8.2-2
+    timeout-minutes: 60
+    needs: [build-gcc]
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install coverage tools
+        run: |
+          apt-get update
+          apt-get install -y lcov
+
+      - name: Configure CMake with coverage
+        run: |
+          mkdir -p build-coverage
+          cd build-coverage
+          cmake .. -G Ninja \
+            -DCMAKE_C_COMPILER=gcc \
+            -DCMAKE_CXX_COMPILER=g++ \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DQT_MAJOR_VERSION=6 \
+            -DBUILD_TESTING=ON \
+            -DCMAKE_CXX_FLAGS="--coverage -fprofile-arcs -ftest-coverage" \
+            -DCMAKE_C_FLAGS="--coverage -fprofile-arcs -ftest-coverage"
+
+      - name: Build
+        run: |
+          cd build-coverage
+          ninja
+
+      - name: Run Kill Switch tests for coverage
+        run: |
+          cd build-coverage
+          useradd -m -s /bin/bash testuser || true
+          chown -R testuser:testuser .
+          su -c 'xvfb-run ctest -R KillSwitch --output-on-failure --timeout 300' testuser
+
+      - name: Generate coverage report
+        run: |
+          cd build-coverage
+
+          # Capture coverage data
+          lcov --capture --directory . --output-file coverage.info --ignore-errors mismatch
+
+          # Filter to only Kill Switch files
+          lcov --extract coverage.info \
+            '*/src/libsync/killswitch/*' \
+            '*/src/gui/killswitch/*' \
+            --output-file coverage-killswitch.info --ignore-errors unused
+
+          # Generate HTML report
+          genhtml coverage-killswitch.info --output-directory coverage-report
+
+          # Print summary
+          echo "::group::Coverage Summary"
+          lcov --summary coverage-killswitch.info || true
+          echo "::endgroup::"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-linux
+          path: build-coverage/coverage-report/
+          retention-days: 14
+
+  # Static analysis with cppcheck
+  static-analysis:
+    name: Static Analysis (cppcheck)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+
+      - name: Run cppcheck on Kill Switch module
+        run: |
+          echo "::group::Cppcheck Analysis"
+
+          cppcheck \
+            --enable=all \
+            --inconclusive \
+            --force \
+            --inline-suppr \
+            --error-exitcode=0 \
+            --xml \
+            --output-file=cppcheck-report.xml \
+            src/libsync/killswitch/ \
+            src/gui/killswitch/ \
+            2>&1 | tee cppcheck-output.txt
+
+          echo "::endgroup::"
+
+          # Check for errors (but don't fail on warnings)
+          if grep -q "error" cppcheck-output.txt; then
+            echo "::warning::Cppcheck found potential issues"
+          fi
+
+      - name: Upload cppcheck report
+        uses: actions/upload-artifact@v4
+        with:
+          name: cppcheck-report
+          path: |
+            cppcheck-report.xml
+            cppcheck-output.txt
+          retention-days: 7
+
+  # Verify Kill Switch module structure
+  verify-structure:
+    name: Verify Module Structure
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check required files exist
+        run: |
+          echo "::group::Checking Kill Switch module structure"
+
+          required_files=(
+            "src/libsync/killswitch/killswitchmanager.h"
+            "src/libsync/killswitch/killswitchmanager.cpp"
+            "src/libsync/killswitch/threatdetector.h"
+            "src/libsync/killswitch/detectors/massdeletedetector.h"
+            "src/libsync/killswitch/detectors/massdeletedetector.cpp"
+            "src/libsync/killswitch/detectors/entropydetector.h"
+            "src/libsync/killswitch/detectors/entropydetector.cpp"
+            "src/libsync/killswitch/detectors/canarydetector.h"
+            "src/libsync/killswitch/detectors/canarydetector.cpp"
+            "src/gui/killswitch/killswitchsettings.h"
+            "src/gui/killswitch/killswitchsettings.cpp"
+            "src/gui/killswitch/killswitchsettings.ui"
+            "src/gui/killswitch/killswitchalertdialog.h"
+            "src/gui/killswitch/killswitchalertdialog.cpp"
+            "src/gui/killswitch/killswitchalertdialog.ui"
+            "test/testkillswitch.cpp"
+          )
+
+          missing=0
+          for file in "${required_files[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✓ $file"
+            else
+              echo "✗ $file (MISSING)"
+              missing=$((missing + 1))
+            fi
+          done
+
+          echo "::endgroup::"
+
+          if [ $missing -gt 0 ]; then
+            echo "::error::$missing required files are missing!"
+            exit 1
+          fi
+
+          echo "All required files present!"
+
+      - name: Check SPDX license headers
+        run: |
+          echo "::group::Checking license headers"
+
+          files=$(find src/libsync/killswitch src/gui/killswitch test/testkillswitch.cpp -name "*.cpp" -o -name "*.h" 2>/dev/null)
+
+          missing_license=0
+          for file in $files; do
+            if ! grep -q "SPDX-License-Identifier" "$file"; then
+              echo "✗ Missing SPDX header: $file"
+              missing_license=$((missing_license + 1))
+            else
+              echo "✓ $file"
+            fi
+          done
+
+          echo "::endgroup::"
+
+          if [ $missing_license -gt 0 ]; then
+            echo "::warning::$missing_license files missing SPDX license headers"
+          fi
+
+      - name: Count lines of code
+        run: |
+          echo "::group::Kill Switch Module Statistics"
+
+          echo "Core module (src/libsync/killswitch/):"
+          find src/libsync/killswitch -name "*.cpp" -o -name "*.h" | xargs wc -l | tail -1
+
+          echo ""
+          echo "GUI module (src/gui/killswitch/):"
+          find src/gui/killswitch -name "*.cpp" -o -name "*.h" -o -name "*.ui" | xargs wc -l | tail -1
+
+          echo ""
+          echo "Tests (test/testkillswitch.cpp):"
+          wc -l test/testkillswitch.cpp
+
+          echo "::endgroup::"
+
+  # Summary job
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [build-gcc, build-clang, static-analysis, verify-structure]
+    if: always()
+
+    steps:
+      - name: Check results
+        run: |
+          echo "## Sentinel CI Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Build (GCC) | ${{ needs.build-gcc.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build (Clang) | ${{ needs.build-clang.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Static Analysis | ${{ needs.static-analysis.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Structure Check | ${{ needs.verify-structure.result }} |" >> $GITHUB_STEP_SUMMARY
+
+          # Determine overall status
+          if [ "${{ needs.build-gcc.result }}" == "success" ] && \
+             [ "${{ needs.build-clang.result }}" == "success" ] && \
+             [ "${{ needs.verify-structure.result }}" == "success" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **All critical checks passed!**" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Some checks failed**" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
