@@ -34,6 +34,7 @@ set(client_UI_SRCS
     generalsettings.ui
     killswitch/killswitchsettings.ui
     killswitch/killswitchalertdialog.ui
+    killswitch/killswitchdashboard.ui
     legalnotice.ui
     ignorelisteditor.ui
     ignorelisttablewidget.ui
@@ -111,6 +112,8 @@ set(client_SRCS
     killswitch/killswitchsettings.cpp
     killswitch/killswitchalertdialog.h
     killswitch/killswitchalertdialog.cpp
+    killswitch/killswitchdashboard.h
+    killswitch/killswitchdashboard.cpp
     legalnotice.h
     legalnotice.cpp
     ignorelisteditor.h
