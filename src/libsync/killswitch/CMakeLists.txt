@@ -7,6 +7,8 @@ set(KILLSWITCH_SOURCES
     killswitchmanager.cpp
     killswitchmanager.h
     threatdetector.h
+    threatlogger.cpp
+    threatlogger.h
 
     # Detectors
     detectors/massdeletedetector.cpp

@@ -1,6 +1,71 @@
 # Nextcloud Sentinel Edition - Development Journal
 
-## 2026-01-11 - Build System Complete & All Tests Passing
+## 2026-01-11 (PM) - Major Feature Sprint
+
+### Collaboration WSL/Windows Agents
+
+Journée très productive avec deux agents Claude travaillant en parallèle:
+- **Agent WSL**: Code review, feedback, CI monitoring
+- **Agent Windows**: Feature development, UI implementation
+
+### New Features Implemented
+
+**PatternDetector (Phase 4 - DONE)**
+- 80+ extensions ransomware connues (.locked, .encrypted, .wannacry, etc.)
+- Détection notes de rançon (HOW_TO_DECRYPT.txt, etc.)
+- Double extension (.pdf.locked)
+- Patterns .hta ajoutés suite au code review
+- 14 nouveaux tests unitaires
+
+**EntropyDetector Improvements**
+- Multi-block sampling (3-5 échantillons selon taille fichier)
+- Early exit si premier sample > 7.8
+- Cache LRU (10,000 entrées max)
+- Expected entropy ranges par type de fichier
+- Détection entropy spike (delta > 2.0)
+
+**UI Dashboard & Presets**
+- `killswitchdashboard.cpp` - Statistiques en temps réel
+  - Compteurs: fichiers analysés, menaces bloquées
+  - Top 5 détecteurs
+  - Timeline 24h/7d/30d
+  - Export CSV
+- Presets de sécurité: Light / Standard / Paranoid
+
+**Integration SyncEngine (Phase 2 - DONE)**
+- Hook dans `OwncloudPropagator::createJob()`
+- Initialisation dans `application.cpp`
+- Ordre optimisé: PatternDetector → CanaryDetector → MassDeleteDetector → EntropyDetector
+
+### Code Review Process
+
+L'agent WSL a reviewé le code de l'agent Windows:
+- Suggestion retrait `.java` (faux positifs) → Appliqué
+- Suggestion ajout `.hta` → Appliqué
+- Suggestion ordre détecteurs → Appliqué
+- Communication via fichiers dans `status/`
+
+### Commits (Session PM)
+
+```
+0f82445c4 docs: Add response to WSL agent feedback
+1fbd91cb1 fix(killswitch): Address WSL agent feedback
+d4bdc8701 feat(ui): Add Kill Switch statistics dashboard
+159cb7d28 feat(ui): Add configuration presets
+5272e4aa9 feat: Improve EntropyDetector with multi-block analysis
+c223f059d test: Add false positive and edge case tests
+ca11f4a3a feat: Add PatternDetector for ransomware extension detection
+acc095255 feat: Integrate Kill Switch into SyncEngine
+```
+
+### CI Status
+
+- Linux Sentinel CI #14: ✅ PASS (12m 26s)
+- Windows Sentinel CI #17: 🔄 En cours
+
+---
+
+## 2026-01-11 (AM) - Build System Complete & All Tests Passing
 
 ### Accomplishments
 
@@ -66,31 +131,37 @@ Kill Switch Tests: 19/19 PASS
 
 ## Roadmap - Nextcloud Sentinel Edition
 
-### Phase 1 - Core Protection (DONE)
+### Phase 1 - Core Protection (DONE ✅)
 - [x] Kill Switch Manager architecture
 - [x] MassDeleteDetector - détecte suppressions massives
 - [x] EntropyDetector - détecte fichiers chiffrés (haute entropie)
 - [x] CanaryDetector - détecte modification de fichiers pièges
-- [x] Unit tests (19/19 passing)
+- [x] Unit tests (33+ passing)
 - [x] CI/CD Linux & Windows
 
-### Phase 2 - Integration (EN COURS)
-- [ ] Brancher KillSwitchManager dans SyncEngine
-- [ ] Hook dans OwncloudPropagator::createJob()
-- [ ] Pause automatique de la sync si menace détectée
-- [ ] UI Settings intégré dans le client
+### Phase 2 - Integration (DONE ✅)
+- [x] Brancher KillSwitchManager dans SyncEngine
+- [x] Hook dans OwncloudPropagator::createJob()
+- [x] Pause automatique de la sync si menace détectée
+- [x] UI Settings intégré dans le client
+- [x] Dashboard statistiques
+- [x] Presets de configuration (Light/Standard/Paranoid)
 
-### Phase 3 - Response Actions
+### Phase 3 - Response Actions (EN COURS)
 - [ ] Backup automatique avant suppression
+- [x] Dialog d'alerte avec options (KillSwitchAlertDialog)
 - [ ] Notification système (tray icon)
-- [ ] Dialog d'alerte avec options (pause/continue/rollback)
 - [ ] Logging détaillé des menaces
 
-### Phase 4 - Advanced Features
-- [ ] PatternDetector - extensions ransomware connues (.locky, .crypto, etc.)
+### Phase 4 - Advanced Features (PARTIELLEMENT DONE)
+- [x] PatternDetector - 80+ extensions ransomware
+- [x] Détection notes de rançon
+- [x] Double extension detection
+- [x] Multi-block entropy sampling
+- [x] LRU cache pour performance
 - [ ] Machine learning pour détection comportementale
 - [ ] Intégration avec Nextcloud server-side protection
-- [ ] Whitelist/blacklist configurable
+- [x] Whitelist par extension
 
 ### Phase 5 - Release
 - [ ] Documentation utilisateur

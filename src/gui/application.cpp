@@ -44,6 +44,8 @@
 #include "libsync/killswitch/detectors/entropydetector.h"
 #include "libsync/killswitch/detectors/canarydetector.h"
 #include "libsync/killswitch/detectors/patterndetector.h"
+#include "libsync/killswitch/threatlogger.h"
+#include "systray.h"
 
 #include "config.h"
 
@@ -511,7 +513,66 @@ void Application::setupAccountsAndFolders()
     killSwitch->registerDetector(std::make_shared<CanaryDetector>());
     killSwitch->registerDetector(std::make_shared<MassDeleteDetector>());
     killSwitch->registerDetector(std::make_shared<EntropyDetector>());
-    qCInfo(lcApplication) << "Kill Switch protection initialized with 4 detectors";
+
+    // Initialize threat logger
+    auto *threatLogger = new ThreatLogger(killSwitch);
+
+    // Connect Kill Switch to threat logger
+    connect(killSwitch, &KillSwitchManager::threatDetected, threatLogger, [threatLogger](const ThreatInfo &threat) {
+        threatLogger->logThreat(threat, QStringLiteral("detected"));
+    });
+
+    connect(killSwitch, &KillSwitchManager::syncPaused, threatLogger, [threatLogger](const QString &reason) {
+        // Log the pause action with an artificial threat entry
+        ThreatInfo pauseInfo;
+        pauseInfo.level = ThreatLevel::High;
+        pauseInfo.description = QStringLiteral("Sync paused: %1").arg(reason);
+        pauseInfo.detectorName = QStringLiteral("KillSwitchManager");
+        pauseInfo.timestamp = QDateTime::currentDateTime();
+        threatLogger->logThreat(pauseInfo, QStringLiteral("sync_paused"));
+    });
+
+    // Connect Kill Switch to system tray notifications
+    connect(killSwitch, &KillSwitchManager::threatDetected, this, [](const ThreatInfo &threat) {
+        QString title = QStringLiteral("Sentinel: Threat Detected");
+        QString message;
+        QSystemTrayIcon::MessageIcon icon = QSystemTrayIcon::Warning;
+
+        switch (threat.level) {
+        case ThreatLevel::Critical:
+            title = QStringLiteral("SENTINEL: CRITICAL THREAT");
+            icon = QSystemTrayIcon::Critical;
+            break;
+        case ThreatLevel::High:
+            title = QStringLiteral("Sentinel: High Threat");
+            icon = QSystemTrayIcon::Critical;
+            break;
+        case ThreatLevel::Medium:
+            title = QStringLiteral("Sentinel: Medium Threat");
+            icon = QSystemTrayIcon::Warning;
+            break;
+        default:
+            icon = QSystemTrayIcon::Information;
+            break;
+        }
+
+        message = QStringLiteral("%1\nDetector: %2\nFiles: %3")
+                      .arg(threat.description)
+                      .arg(threat.detectorName)
+                      .arg(threat.affectedFiles.join(QStringLiteral(", ")));
+
+        Systray::instance()->showMessage(title, message, icon);
+    });
+
+    // Connect Kill Switch pause signal to systray
+    connect(killSwitch, &KillSwitchManager::syncPaused, this, [](const QString &reason) {
+        Systray::instance()->showMessage(
+            QStringLiteral("Sentinel: Sync Paused"),
+            QStringLiteral("Synchronization has been paused for your protection.\nReason: %1").arg(reason),
+            QSystemTrayIcon::Warning);
+    });
+
+    qCInfo(lcApplication) << "Kill Switch protection initialized with 4 detectors and notifications";
 
     ConfigFile configFile;
     configFile.setMigrationPhase(ConfigFile::MigrationPhase::SetupUsers);
