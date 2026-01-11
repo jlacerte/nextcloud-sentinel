@@ -36,6 +36,9 @@ KillSwitchManager::KillSwitchManager(QObject *parent)
 
 KillSwitchManager::~KillSwitchManager()
 {
+    // Stop the window timer to prevent callbacks on destroyed object
+    m_windowTimer.stop();
+
     if (s_instance == this) {
         s_instance = nullptr;
     }
