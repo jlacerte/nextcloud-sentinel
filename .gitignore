@@ -201,3 +201,9 @@ DerivedData
 
 # Swift Package Manager Build Artifacts
 .swiftpm
+# Local build scripts (Sentinel Edition)
+BUILD.bat
+CLICK-ME-FIRST.bat
+SETUP-WINDOWS.ps1
+build-local.ps1
+build-wsl.sh
