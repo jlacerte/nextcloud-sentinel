@@ -653,6 +653,316 @@ private slots:
         QVERIFY(!blocked);
         QVERIFY(!_manager->isTriggered());
     }
+
+    // ==================== False Positive Prevention Tests ====================
+
+    void testFalsePositive_BatchUpload()
+    {
+        // Scenario: User uploads 20 new files rapidly (batch upload from phone)
+        // Expected: No trigger - batch uploads are normal behavior
+        auto massDeleteDetector = std::make_shared<MassDeleteDetector>();
+        massDeleteDetector->setThreshold(10);
+        _manager->registerDetector(massDeleteDetector);
+
+        // Batch of 20 CREATE operations - NOT deletions
+        for (int i = 0; i < 20; i++) {
+            SyncFileItem item;
+            item._instruction = CSYNC_INSTRUCTION_NEW;
+            item._file = QString("photos/vacation/IMG_%1.jpg").arg(i, 4, 10, QChar('0'));
+
+            _manager->analyzeItem(item);
+        }
+
+        // Should NOT trigger - these are creates, not deletes
+        QVERIFY(!_manager->isTriggered());
+    }
+
+    void testFalsePositive_ArchiveExtraction()
+    {
+        // Scenario: User extracts a large ZIP file, creating many files at once
+        // Expected: No trigger - archive extraction is normal
+        auto massDeleteDetector = std::make_shared<MassDeleteDetector>();
+        massDeleteDetector->setThreshold(10);
+        _manager->registerDetector(massDeleteDetector);
+
+        // Simulate extraction: many new files
+        QStringList extractedFiles = {
+            "archive/README.md",
+            "archive/src/main.cpp",
+            "archive/src/utils.cpp",
+            "archive/src/config.h",
+            "archive/include/types.h",
+            "archive/docs/manual.pdf",
+            "archive/tests/test1.cpp",
+            "archive/tests/test2.cpp",
+            "archive/build/Makefile"
+        };
+
+        for (const auto &file : extractedFiles) {
+            SyncFileItem item;
+            item._instruction = CSYNC_INSTRUCTION_NEW;
+            item._file = file;
+            _manager->analyzeItem(item);
+        }
+
+        QVERIFY(!_manager->isTriggered());
+    }
+
+    void testFalsePositive_BuildCleanup()
+    {
+        // Scenario: Developer runs "rm -rf node_modules" or "make clean"
+        // Expected: Eventually triggers (protection against accidental rm -rf)
+        // Note: This is intentionally a VALID trigger - we want to catch rm -rf
+        auto massDeleteDetector = std::make_shared<MassDeleteDetector>();
+        massDeleteDetector->setThreshold(10);
+        _manager->registerDetector(massDeleteDetector);
+
+        // Simulate deleting node_modules (massive deletion)
+        for (int i = 0; i < 15; i++) {
+            SyncFileItem item;
+            item._instruction = CSYNC_INSTRUCTION_REMOVE;
+            item._file = QString("project/node_modules/package%1/index.js").arg(i);
+            _manager->analyzeItem(item);
+        }
+
+        // SHOULD trigger - mass deletion is dangerous even in node_modules
+        // Users should use .gitignore or sync exclusions for build folders
+        QVERIFY(_manager->isTriggered());
+    }
+
+    void testFalsePositive_TempFilesSystemCleanup()
+    {
+        // Scenario: System cleans temp files one by one (not mass deletion)
+        // Expected: No trigger if below threshold
+        auto massDeleteDetector = std::make_shared<MassDeleteDetector>();
+        massDeleteDetector->setThreshold(10);
+        _manager->registerDetector(massDeleteDetector);
+
+        // Only 5 temp file deletions - below threshold
+        for (int i = 0; i < 5; i++) {
+            SyncFileItem item;
+            item._instruction = CSYNC_INSTRUCTION_REMOVE;
+            item._file = QString("temp/session_%1.tmp").arg(i);
+            _manager->analyzeItem(item);
+        }
+
+        // Should NOT trigger - below threshold
+        QVERIFY(!_manager->isTriggered());
+    }
+
+    void testFalsePositive_HighEntropyMediaFiles()
+    {
+        // Scenario: Syncing compressed media (JPEG, MP4) which has high entropy
+        // Expected: No trigger - compressed media is normal
+        EntropyDetector detector;
+
+        // JPEG and MP4 are naturally high entropy - should be whitelisted
+        QVERIFY(detector.isNormallyHighEntropy("photo.jpg"));
+        QVERIFY(detector.isNormallyHighEntropy("video.mp4"));
+        QVERIFY(detector.isNormallyHighEntropy("archive.zip"));
+        QVERIFY(detector.isNormallyHighEntropy("compressed.7z"));
+        QVERIFY(detector.isNormallyHighEntropy("document.pdf")); // PDFs often have compressed content
+    }
+
+    void testFalsePositive_CompressedArchivesNotRansomware()
+    {
+        // Scenario: User syncs legitimate compressed files
+        // Expected: Pattern detector should NOT flag .zip, .7z as ransomware
+        PatternDetector detector;
+
+        // Normal archive extensions should NOT be flagged
+        QVERIFY(!detector.hasRansomwareExtension("backup.zip"));
+        QVERIFY(!detector.hasRansomwareExtension("data.7z"));
+        QVERIFY(!detector.hasRansomwareExtension("archive.tar.gz"));
+        QVERIFY(!detector.hasRansomwareExtension("files.rar"));
+    }
+
+    void testFalsePositive_GitOperations()
+    {
+        // Scenario: git checkout or branch switch causing many file changes
+        // Expected: Modifications shouldn't trigger mass delete detector
+        auto massDeleteDetector = std::make_shared<MassDeleteDetector>();
+        massDeleteDetector->setThreshold(10);
+        _manager->registerDetector(massDeleteDetector);
+
+        // Simulate git checkout with many modified files
+        for (int i = 0; i < 30; i++) {
+            SyncFileItem item;
+            item._instruction = CSYNC_INSTRUCTION_SYNC; // Modify, not delete
+            item._file = QString("src/file%1.cpp").arg(i);
+            _manager->analyzeItem(item);
+        }
+
+        // Should NOT trigger - modifications are not deletions
+        QVERIFY(!_manager->isTriggered());
+    }
+
+    void testFalsePositive_RenameNotRansomware()
+    {
+        // Scenario: File renamed to have suspicious-looking extension legitimately
+        // Expected: Single file rename should only be Low threat
+        PatternDetector detector;
+        detector.setThreshold(3);
+
+        SyncFileItem item;
+        item._instruction = CSYNC_INSTRUCTION_NEW;
+        item._file = "my_locked_door_photo.jpg.locked"; // Legitimate filename? Suspicious!
+
+        QVector<KillSwitchManager::Event> events;
+        ThreatInfo result = detector.analyze(item, events);
+
+        // Should be Medium (double extension) but not Critical
+        // User can dismiss single false positive
+        QVERIFY(result.level <= ThreatLevel::Medium);
+        QVERIFY(result.level != ThreatLevel::Critical);
+    }
+
+    // ==================== Edge Case Tests ====================
+
+    void testEdgeCase_EmptyFile()
+    {
+        // Empty files should have 0 entropy
+        QByteArray empty;
+        double entropy = EntropyDetector::calculateEntropy(empty);
+        QCOMPARE(entropy, 0.0);
+    }
+
+    void testEdgeCase_SingleByteFile()
+    {
+        // Single byte file - entropy should be 0 (no randomness possible)
+        QByteArray single;
+        single.append('X');
+        double entropy = EntropyDetector::calculateEntropy(single);
+        QCOMPARE(entropy, 0.0);
+    }
+
+    void testEdgeCase_TwoBytesFile()
+    {
+        // Two different bytes - entropy should be 1.0 (log2(2))
+        QByteArray two;
+        two.append('A');
+        two.append('B');
+        double entropy = EntropyDetector::calculateEntropy(two);
+        QVERIFY(qAbs(entropy - 1.0) < 0.001);
+    }
+
+    void testEdgeCase_LongFilePath()
+    {
+        // Windows MAX_PATH is 260 characters, but we should handle longer
+        PatternDetector detector;
+
+        QString longPath = "very/deep/nested/folder/structure/";
+        for (int i = 0; i < 10; i++) {
+            longPath += QString("level%1/").arg(i);
+        }
+        longPath += "document.locked";
+
+        QVERIFY(longPath.length() > 100);
+        QVERIFY(detector.hasRansomwareExtension(longPath));
+    }
+
+    void testEdgeCase_UnicodeFilename()
+    {
+        // Unicode characters in filename
+        PatternDetector detector;
+
+        // Japanese filename with ransomware extension
+        QString unicodeFile = QString::fromUtf8("ドキュメント.locked");
+        QVERIFY(detector.hasRansomwareExtension(unicodeFile));
+
+        // Emoji in filename (should still detect extension)
+        QVERIFY(detector.hasRansomwareExtension("my_docs_🔒.encrypted"));
+    }
+
+    void testEdgeCase_ExactThreshold()
+    {
+        // Test behavior exactly at threshold boundary
+        MassDeleteDetector detector;
+        detector.setThreshold(5);
+
+        SyncFileItem item;
+        item._instruction = CSYNC_INSTRUCTION_REMOVE;
+        item._file = "test.txt";
+
+        // Exactly 5 events (at threshold)
+        QVector<KillSwitchManager::Event> events;
+        for (int i = 0; i < 5; i++) {
+            events.append({QDateTime::currentDateTime(), "DELETE", QString("file%1.txt").arg(i)});
+        }
+
+        ThreatInfo result = detector.analyze(item, events);
+
+        // At exact threshold should trigger
+        QVERIFY(result.level >= ThreatLevel::High);
+    }
+
+    void testEdgeCase_BelowThreshold()
+    {
+        // Test behavior just below threshold
+        MassDeleteDetector detector;
+        detector.setThreshold(5);
+
+        SyncFileItem item;
+        item._instruction = CSYNC_INSTRUCTION_REMOVE;
+        item._file = "test.txt";
+
+        // Only 4 events (below threshold of 5)
+        QVector<KillSwitchManager::Event> events;
+        for (int i = 0; i < 4; i++) {
+            events.append({QDateTime::currentDateTime(), "DELETE", QString("file%1.txt").arg(i)});
+        }
+
+        ThreatInfo result = detector.analyze(item, events);
+
+        // Below threshold should not trigger high threat
+        QVERIFY(result.level < ThreatLevel::High);
+    }
+
+    void testEdgeCase_RapidResetTrigger()
+    {
+        // Test trigger -> reset -> trigger sequence
+        auto canaryDetector = std::make_shared<CanaryDetector>();
+        _manager->registerDetector(canaryDetector);
+
+        // First trigger
+        SyncFileItem item1;
+        item1._instruction = CSYNC_INSTRUCTION_REMOVE;
+        item1._file = "_canary.txt";
+        _manager->analyzeItem(item1);
+        QVERIFY(_manager->isTriggered());
+
+        // Reset
+        _manager->reset();
+        QVERIFY(!_manager->isTriggered());
+
+        // Should be able to trigger again
+        SyncFileItem item2;
+        item2._instruction = CSYNC_INSTRUCTION_REMOVE;
+        item2._file = ".canary";
+        _manager->analyzeItem(item2);
+        QVERIFY(_manager->isTriggered());
+    }
+
+    void testEdgeCase_MultipleDetectorsSameFile()
+    {
+        // File triggers multiple detectors
+        auto patternDetector = std::make_shared<PatternDetector>();
+        auto canaryDetector = std::make_shared<CanaryDetector>();
+
+        _manager->registerDetector(patternDetector);
+        _manager->registerDetector(canaryDetector);
+
+        // This file is both a canary pattern AND has ransomware extension
+        SyncFileItem item;
+        item._instruction = CSYNC_INSTRUCTION_SYNC; // Modify
+        item._file = "_canary.txt.encrypted";
+
+        bool blocked = _manager->analyzeItem(item);
+
+        // Should definitely be blocked
+        QVERIFY(blocked);
+        QVERIFY(_manager->isTriggered());
+    }
 };
 
 QTEST_GUILESS_MAIN(TestKillSwitch)

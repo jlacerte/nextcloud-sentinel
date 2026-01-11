@@ -54,11 +54,19 @@ public:
      */
     static double calculateFileEntropy(const QString &filePath, int sampleSize = 65536);
 
-private:
     /**
      * @brief Check if file type normally has high entropy
+     * @param filePath Path to the file (used to check extension)
+     * @return true if the file extension indicates compressed/encrypted content
+     *
+     * High-entropy file types that should be whitelisted:
+     * - Compressed formats: .zip, .7z, .rar, .gz, .bz2
+     * - Media files: .jpg, .jpeg, .png, .gif, .mp3, .mp4, .avi
+     * - Already encrypted: .pdf (often), .docx, .xlsx (ZIP-based)
      */
     bool isNormallyHighEntropy(const QString &filePath) const;
+
+private:
 
     /**
      * @brief Get expected entropy range for file type
