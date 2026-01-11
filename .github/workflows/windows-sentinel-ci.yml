@@ -121,6 +121,13 @@ jobs:
         run: |
           echo "${{ github.workspace }}\${{ env.CRAFT_TARGET }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
+      - name: Install Inkscape (for icon generation)
+        shell: pwsh
+        run: |
+          Write-Host "::group::Install Inkscape via Chocolatey"
+          choco install inkscape -y --no-progress
+          Write-Host "::endgroup::"
+
       - name: Build Nextcloud Sentinel
         shell: pwsh
         run: |
