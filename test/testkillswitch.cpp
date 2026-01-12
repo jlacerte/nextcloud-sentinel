@@ -17,6 +17,7 @@
 #include "libsync/killswitch/detectors/entropydetector.h"
 #include "libsync/killswitch/detectors/canarydetector.h"
 #include "libsync/killswitch/detectors/patterndetector.h"
+#include "libsync/killswitch/actions/backupaction.h"
 #include "libsync/syncfileitem.h"
 
 using namespace OCC;
@@ -1441,6 +1442,179 @@ private slots:
 
         // 4 events with threshold 10 = below 50% = no threat
         QVERIFY(result.level == ThreatLevel::None);
+    }
+
+    // ==================== BackupAction Tests ====================
+
+    void testBackupAction_Initialization()
+    {
+        BackupAction action;
+        QCOMPARE(action.name(), QStringLiteral("BackupAction"));
+        QVERIFY(action.isEnabled());
+        QCOMPARE(action.maxBackupSizeMB(), 500);
+        QCOMPARE(action.retentionDays(), 7);
+        QCOMPARE(action.filesBackedUp(), 0);
+        QCOMPARE(action.bytesBackedUp(), 0);
+    }
+
+    void testBackupAction_Configuration()
+    {
+        BackupAction action;
+
+        action.setMaxBackupSizeMB(1000);
+        QCOMPARE(action.maxBackupSizeMB(), 1000);
+
+        action.setRetentionDays(14);
+        QCOMPARE(action.retentionDays(), 14);
+
+        QString testDir = QDir::tempPath() + QStringLiteral("/sentinel-test-backup");
+        action.setBackupDirectory(testDir);
+        QCOMPARE(action.backupDirectory(), testDir);
+
+        // Cleanup
+        QDir(testDir).removeRecursively();
+    }
+
+    void testBackupAction_SingleFile()
+    {
+        // Create a test file
+        QString tempDir = QDir::tempPath() + QStringLiteral("/sentinel-test-") +
+                          QString::number(QDateTime::currentMSecsSinceEpoch());
+        QDir().mkpath(tempDir);
+
+        QString testFile = tempDir + QStringLiteral("/testfile.txt");
+        QFile file(testFile);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("Test content for backup");
+        file.close();
+
+        // Setup backup action
+        QString backupDir = tempDir + QStringLiteral("/backups");
+        BackupAction action;
+        action.setBackupDirectory(backupDir);
+
+        // Create threat info
+        ThreatInfo threat;
+        threat.level = ThreatLevel::High;
+        threat.description = QStringLiteral("Test threat");
+        threat.detectorName = QStringLiteral("TestDetector");
+        threat.affectedFiles.append(testFile);
+        threat.timestamp = QDateTime::currentDateTime();
+
+        // Execute backup
+        action.execute(threat);
+
+        // Verify backup was created
+        QCOMPARE(action.filesBackedUp(), 1);
+        QVERIFY(action.bytesBackedUp() > 0);
+        QVERIFY(!action.lastBackupPath().isEmpty());
+        QVERIFY(QDir(action.lastBackupPath()).exists());
+
+        // Cleanup
+        QDir(tempDir).removeRecursively();
+    }
+
+    void testBackupAction_MultipleFiles()
+    {
+        // Create test files
+        QString tempDir = QDir::tempPath() + QStringLiteral("/sentinel-test-") +
+                          QString::number(QDateTime::currentMSecsSinceEpoch());
+        QDir().mkpath(tempDir);
+
+        QStringList testFiles;
+        for (int i = 0; i < 5; i++) {
+            QString testFile = tempDir + QStringLiteral("/file%1.txt").arg(i);
+            QFile file(testFile);
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            file.write(QStringLiteral("Content of file %1").arg(i).toUtf8());
+            file.close();
+            testFiles.append(testFile);
+        }
+
+        // Setup backup action
+        QString backupDir = tempDir + QStringLiteral("/backups");
+        BackupAction action;
+        action.setBackupDirectory(backupDir);
+
+        // Create threat info
+        ThreatInfo threat;
+        threat.level = ThreatLevel::Critical;
+        threat.description = QStringLiteral("Multiple files threat");
+        threat.detectorName = QStringLiteral("TestDetector");
+        threat.affectedFiles = testFiles;
+        threat.timestamp = QDateTime::currentDateTime();
+
+        // Execute backup
+        action.execute(threat);
+
+        // Verify all files were backed up
+        QCOMPARE(action.filesBackedUp(), 5);
+        QVERIFY(action.bytesBackedUp() > 0);
+
+        // Cleanup
+        QDir(tempDir).removeRecursively();
+    }
+
+    void testBackupAction_Disabled()
+    {
+        QString tempDir = QDir::tempPath() + QStringLiteral("/sentinel-test-") +
+                          QString::number(QDateTime::currentMSecsSinceEpoch());
+        QDir().mkpath(tempDir);
+
+        QString testFile = tempDir + QStringLiteral("/testfile.txt");
+        QFile file(testFile);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("Test content");
+        file.close();
+
+        QString backupDir = tempDir + QStringLiteral("/backups");
+        BackupAction action;
+        action.setBackupDirectory(backupDir);
+        action.setEnabled(false);
+
+        ThreatInfo threat;
+        threat.level = ThreatLevel::High;
+        threat.affectedFiles.append(testFile);
+
+        action.execute(threat);
+
+        // Nothing should be backed up when disabled
+        QCOMPARE(action.filesBackedUp(), 0);
+
+        // Cleanup
+        QDir(tempDir).removeRecursively();
+    }
+
+    void testBackupAction_CleanOldBackups()
+    {
+        QString tempDir = QDir::tempPath() + QStringLiteral("/sentinel-test-") +
+                          QString::number(QDateTime::currentMSecsSinceEpoch());
+        QString backupDir = tempDir + QStringLiteral("/backups");
+        QDir().mkpath(backupDir);
+
+        // Create some "old" backup directories (simulate old timestamps)
+        QDir backups(backupDir);
+        QDateTime oldDate = QDateTime::currentDateTime().addDays(-10);
+        QString oldSessionName = oldDate.toString(QStringLiteral("yyyy-MM-dd_HHmmss"));
+        QDir().mkpath(backupDir + "/" + oldSessionName);
+
+        // Create a recent backup directory
+        QString recentSessionName = QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd_HHmmss"));
+        QDir().mkpath(backupDir + "/" + recentSessionName);
+
+        BackupAction action;
+        action.setBackupDirectory(backupDir);
+        action.setRetentionDays(7);
+
+        int removed = action.cleanOldBackups();
+
+        // Old backup should be removed
+        QCOMPARE(removed, 1);
+        QVERIFY(!QDir(backupDir + "/" + oldSessionName).exists());
+        QVERIFY(QDir(backupDir + "/" + recentSessionName).exists());
+
+        // Cleanup
+        QDir(tempDir).removeRecursively();
     }
 };
 

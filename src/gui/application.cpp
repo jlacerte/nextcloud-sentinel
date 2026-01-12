@@ -45,6 +45,7 @@
 #include "libsync/killswitch/detectors/canarydetector.h"
 #include "libsync/killswitch/detectors/patterndetector.h"
 #include "libsync/killswitch/threatlogger.h"
+#include "libsync/killswitch/actions/backupaction.h"
 #include "systray.h"
 
 #include "config.h"
@@ -572,7 +573,16 @@ void Application::setupAccountsAndFolders()
             QSystemTrayIcon::Warning);
     });
 
-    qCInfo(lcApplication) << "Kill Switch protection initialized with 4 detectors and notifications";
+    // Register backup action for automatic file backup on threat detection
+    auto backupAction = std::make_shared<BackupAction>();
+    QString backupPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+                         + QStringLiteral("/sentinel-backups");
+    backupAction->setBackupDirectory(backupPath);
+    backupAction->setMaxBackupSizeMB(500);  // 500MB max
+    backupAction->setRetentionDays(7);       // Keep 7 days
+    killSwitch->registerAction(backupAction);
+
+    qCInfo(lcApplication) << "Kill Switch protection initialized with 4 detectors, backup action, and notifications";
 
     ConfigFile configFile;
     configFile.setMigrationPhase(ConfigFile::MigrationPhase::SetupUsers);

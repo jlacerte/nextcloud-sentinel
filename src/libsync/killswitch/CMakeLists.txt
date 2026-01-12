@@ -22,6 +22,8 @@ set(KILLSWITCH_SOURCES
 
     # Actions
     actions/syncaction.h
+    actions/backupaction.cpp
+    actions/backupaction.h
 )
 
 # Add to parent scope for libsync
