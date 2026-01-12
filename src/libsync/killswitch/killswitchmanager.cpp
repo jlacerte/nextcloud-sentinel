@@ -307,3 +307,4 @@ void KillSwitchManager::recordEvent(const QString &eventType, const QString &pat
 }
 
 } // namespace OCC
+// CodeRabbit integration test - delete this line
