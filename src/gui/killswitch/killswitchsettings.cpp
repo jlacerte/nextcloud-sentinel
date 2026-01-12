@@ -6,6 +6,7 @@
  */
 
 #include "killswitchsettings.h"
+#include "threathistorydialog.h"
 #include "ui_killswitchsettings.h"
 
 #include "libsync/killswitch/killswitchmanager.h"
@@ -78,6 +79,8 @@ void KillSwitchSettings::setupConnections()
     // Actions
     connect(_ui->resetButton, &QPushButton::clicked,
             this, &KillSwitchSettings::slotResetKillSwitch);
+    connect(_ui->viewHistoryButton, &QPushButton::clicked,
+            this, &KillSwitchSettings::slotViewThreatHistory);
     connect(_ui->clearHistoryButton, &QPushButton::clicked,
             this, &KillSwitchSettings::slotClearThreatHistory);
 
@@ -474,6 +477,13 @@ void KillSwitchSettings::slotStyleChanged()
 void KillSwitchSettings::customizeStyle()
 {
     // Apply theme-specific styling if needed
+}
+
+
+void KillSwitchSettings::slotViewThreatHistory()
+{
+    ThreatHistoryDialog dialog(this);
+    dialog.exec();
 }
 
 } // namespace OCC

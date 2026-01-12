@@ -337,6 +337,13 @@
          </spacer>
         </item>
         <item>
+         <widget class="QPushButton" name="viewHistoryButton">
+          <property name="text">
+           <string>View Full History...</string>
+          </property>
+         </widget>
+        </item>
+        <item>
          <widget class="QPushButton" name="clearHistoryButton">
           <property name="text">
            <string>Clear History</string>

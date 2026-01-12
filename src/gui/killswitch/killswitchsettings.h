@@ -54,6 +54,7 @@ private slots:
     void slotRemoveCanaryFile();
     void slotResetKillSwitch();
     void slotClearThreatHistory();
+    void slotViewThreatHistory();
 
     // Updates from KillSwitchManager
     void slotThreatDetected(const ThreatInfo &threat);
