@@ -1616,6 +1616,216 @@ private slots:
         // Cleanup
         QDir(tempDir).removeRecursively();
     }
+
+    // ==================== Real Encrypted File Tests ====================
+
+    void testEntropyDetector_RealEncryptedAES256()
+    {
+        // Test with real AES-256 encrypted file
+        QString testFile = QFINDTESTDATA("data/encrypted/aes256.txt.enc");
+        if (testFile.isEmpty()) {
+            QSKIP("Test data not found - run generate-test-files.sh first");
+        }
+
+        EntropyDetector detector;
+        double entropy = EntropyDetector::calculateFileEntropy(testFile);
+
+        qDebug() << "AES-256 encrypted file entropy:" << entropy;
+
+        // Encrypted files should have very high entropy (>7.5)
+        QVERIFY2(entropy >= 7.5, qPrintable(QStringLiteral("Entropy %1 is too low for encrypted file").arg(entropy)));
+    }
+
+    void testEntropyDetector_RealNormalText()
+    {
+        // Test with normal text file
+        QString testFile = QFINDTESTDATA("data/encrypted/normal.txt");
+        if (testFile.isEmpty()) {
+            QSKIP("Test data not found - run generate-test-files.sh first");
+        }
+
+        EntropyDetector detector;
+        double entropy = EntropyDetector::calculateFileEntropy(testFile);
+
+        qDebug() << "Normal text file entropy:" << entropy;
+
+        // Normal text should have lower entropy (3.5-5.5)
+        QVERIFY2(entropy >= 3.0 && entropy <= 6.0,
+                 qPrintable(QStringLiteral("Entropy %1 unexpected for normal text").arg(entropy)));
+    }
+
+    void testEntropyDetector_RealSourceCode()
+    {
+        // Test with source code file
+        QString testFile = QFINDTESTDATA("data/encrypted/source.cpp");
+        if (testFile.isEmpty()) {
+            QSKIP("Test data not found - run generate-test-files.sh first");
+        }
+
+        EntropyDetector detector;
+        double entropy = EntropyDetector::calculateFileEntropy(testFile);
+
+        qDebug() << "Source code file entropy:" << entropy;
+
+        // Source code typically has entropy 4.5-6.5
+        QVERIFY2(entropy >= 4.0 && entropy <= 7.0,
+                 qPrintable(QStringLiteral("Entropy %1 unexpected for source code").arg(entropy)));
+    }
+
+    void testEntropyDetector_CompareEncryptedVsNormal()
+    {
+        QString encryptedFile = QFINDTESTDATA("data/encrypted/aes256.txt.enc");
+        QString normalFile = QFINDTESTDATA("data/encrypted/normal.txt");
+
+        if (encryptedFile.isEmpty() || normalFile.isEmpty()) {
+            QSKIP("Test data not found - run generate-test-files.sh first");
+        }
+
+        double encryptedEntropy = EntropyDetector::calculateFileEntropy(encryptedFile);
+        double normalEntropy = EntropyDetector::calculateFileEntropy(normalFile);
+
+        qDebug() << "Encrypted entropy:" << encryptedEntropy << "Normal entropy:" << normalEntropy;
+
+        // Encrypted file should have significantly higher entropy
+        QVERIFY2(encryptedEntropy > normalEntropy + 2.0,
+                 qPrintable(QStringLiteral("Encrypted (%1) should be much higher than normal (%2)")
+                            .arg(encryptedEntropy).arg(normalEntropy)));
+    }
+
+    void testPatternDetector_RealRansomNote()
+    {
+        QString noteFile = QFINDTESTDATA("data/encrypted/HOW_TO_DECRYPT.txt");
+        if (noteFile.isEmpty()) {
+            QSKIP("Test data not found - run generate-test-files.sh first");
+        }
+
+        PatternDetector detector;
+        QString fileName = QFileInfo(noteFile).fileName();
+
+        QVERIFY2(detector.isRansomNote(fileName),
+                 qPrintable(QStringLiteral("Should detect %1 as ransom note").arg(fileName)));
+    }
+
+    void testPatternDetector_RealRansomNote_Readme()
+    {
+        QString noteFile = QFINDTESTDATA("data/encrypted/_readme_.txt");
+        if (noteFile.isEmpty()) {
+            QSKIP("Test data not found - run generate-test-files.sh first");
+        }
+
+        PatternDetector detector;
+        QString fileName = QFileInfo(noteFile).fileName();
+
+        QVERIFY2(detector.isRansomNote(fileName),
+                 qPrintable(QStringLiteral("Should detect %1 as ransom note").arg(fileName)));
+    }
+
+    void testPatternDetector_RealDoubleExtensions()
+    {
+        PatternDetector detector;
+
+        // Test real ransomware-style double extensions
+        QStringList ransomFiles = {
+            "document.pdf.locked",
+            "spreadsheet.xlsx.encrypted",
+            "photo.jpg.crypted",
+            "database.sql.wannacry",
+            "presentation.pptx.locky",
+            "archive.zip.cerber"
+        };
+
+        for (const QString &fileName : ransomFiles) {
+            QVERIFY2(detector.hasDoubleExtension(fileName),
+                     qPrintable(QStringLiteral("Should detect double extension in: %1").arg(fileName)));
+        }
+    }
+
+    void testPatternDetector_LegitimateDoubleExtensions()
+    {
+        PatternDetector detector;
+
+        // These should NOT be detected as ransomware
+        QStringList legitFiles = {
+            "archive.tar.gz",      // Normal compressed archive
+            "backup.tar.bz2",      // Normal compressed archive
+            "script.min.js",       // Minified JavaScript
+            "image.thumb.jpg",     // Thumbnail image
+        };
+
+        for (const QString &fileName : legitFiles) {
+            bool detected = detector.hasDoubleExtension(fileName);
+            // tar.gz and tar.bz2 might be detected, but .min.js and .thumb.jpg should not
+            if (fileName.contains(".min.") || fileName.contains(".thumb.")) {
+                QVERIFY2(!detected,
+                         qPrintable(QStringLiteral("Should NOT detect: %1").arg(fileName)));
+            }
+        }
+    }
+
+    void testFullPipeline_RealEncryptedFile()
+    {
+        QString encryptedFile = QFINDTESTDATA("data/encrypted/document.pdf.locked");
+        if (encryptedFile.isEmpty()) {
+            QSKIP("Test data not found - run generate-test-files.sh first");
+        }
+
+        // Setup manager with detectors
+        KillSwitchManager manager;
+        manager.registerDetector(std::make_shared<PatternDetector>());
+        manager.registerDetector(std::make_shared<EntropyDetector>());
+
+        // Create sync item for the encrypted file
+        SyncFileItem item;
+        item._file = encryptedFile;
+        item._instruction = CSYNC_INSTRUCTION_NEW;
+        item._type = ItemTypeFile;
+
+        // Should be blocked due to double extension pattern
+        bool blocked = manager.analyzeItem(item);
+
+        QVERIFY2(blocked, "Encrypted file with ransomware extension should be blocked");
+    }
+
+    void testFullPipeline_RealRansomNote()
+    {
+        QString ransomNote = QFINDTESTDATA("data/encrypted/HOW_TO_DECRYPT.txt");
+        if (ransomNote.isEmpty()) {
+            QSKIP("Test data not found - run generate-test-files.sh first");
+        }
+
+        KillSwitchManager manager;
+        manager.registerDetector(std::make_shared<PatternDetector>());
+
+        SyncFileItem item;
+        item._file = ransomNote;
+        item._instruction = CSYNC_INSTRUCTION_NEW;
+        item._type = ItemTypeFile;
+
+        bool blocked = manager.analyzeItem(item);
+
+        QVERIFY2(blocked, "Ransom note should be blocked immediately");
+    }
+
+    void testFullPipeline_NormalFilePasses()
+    {
+        QString normalFile = QFINDTESTDATA("data/encrypted/normal.txt");
+        if (normalFile.isEmpty()) {
+            QSKIP("Test data not found - run generate-test-files.sh first");
+        }
+
+        KillSwitchManager manager;
+        manager.registerDetector(std::make_shared<PatternDetector>());
+        manager.registerDetector(std::make_shared<EntropyDetector>());
+
+        SyncFileItem item;
+        item._file = normalFile;
+        item._instruction = CSYNC_INSTRUCTION_NEW;
+        item._type = ItemTypeFile;
+
+        bool blocked = manager.analyzeItem(item);
+
+        QVERIFY2(!blocked, "Normal text file should NOT be blocked");
+    }
 };
 
 QTEST_GUILESS_MAIN(TestKillSwitch)

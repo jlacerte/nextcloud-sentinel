@@ -1,0 +1,15 @@
+!!! YOUR FILES HAVE BEEN ENCRYPTED !!!
+
+All your important files have been encrypted with military-grade AES-256.
+To decrypt your files, you need to pay 0.5 Bitcoin to the following address:
+
+    1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
+
+After payment, contact us at: ransomware@darkweb.onion
+
+DO NOT:
+- Try to decrypt files yourself
+- Contact law enforcement
+- Delete this file
+
+You have 72 hours before the price doubles.

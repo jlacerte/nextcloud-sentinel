@@ -1,0 +1,9 @@
+{
+    "name": "Nextcloud Sentinel",
+    "version": "1.0.0",
+    "settings": {
+        "enabled": true,
+        "threshold": 7.5,
+        "detectors": ["entropy", "pattern", "canary"]
+    }
+}

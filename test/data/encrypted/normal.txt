@@ -1,0 +1,8 @@
+This is a normal text document with regular English content.
+It contains common words and phrases that you would find in
+any typical document. The entropy of this file should be
+relatively low, around 4-5 bits per byte, because natural
+language has predictable patterns and redundancy.
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
