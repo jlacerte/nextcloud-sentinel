@@ -1,0 +1,42 @@
+# CodeRabbit Configuration for Nextcloud Sentinel
+# https://docs.coderabbit.ai/guides/configure-coderabbit
+
+language: "fr-CA"
+
+reviews:
+  # Enable automatic reviews on PRs
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - master
+
+  # Review profile - assertive gives more thorough feedback
+  profile: "assertive"
+
+  # Focus areas for Kill Switch code
+  path_instructions:
+    - path: "src/libsync/killswitch/**"
+      instructions: |
+        This is the Kill Switch anti-ransomware module. Pay special attention to:
+        - Security vulnerabilities
+        - False positive/negative detection rates
+        - Performance impact on sync operations
+        - Thread safety
+    - path: "test/**"
+      instructions: |
+        Test files. Ensure good coverage and meaningful assertions.
+
+  # Request changes vs comments
+  request_changes_workflow: true
+
+chat:
+  # Enable chat in PR comments
+  auto_reply: true
+
+# Ignore generated/vendor files
+path_filters:
+  - "!**/node_modules/**"
+  - "!**/build/**"
+  - "!**/.git/**"
+  - "!**/translations/**"
