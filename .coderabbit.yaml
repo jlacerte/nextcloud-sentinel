@@ -1,9 +1,18 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 # CodeRabbit Configuration for Nextcloud Sentinel
-# https://docs.coderabbit.ai/guides/configure-coderabbit
 
 language: "fr-CA"
 
 reviews:
+  # Review profile - assertive gives more thorough feedback
+  profile: "assertive"
+
+  # Generate PR summary
+  high_level_summary: true
+
+  # Request changes vs comments
+  request_changes_workflow: true
+
   # Enable automatic reviews on PRs
   auto_review:
     enabled: true
@@ -11,8 +20,12 @@ reviews:
     base_branches:
       - master
 
-  # Review profile - assertive gives more thorough feedback
-  profile: "assertive"
+  # Ignore generated/vendor files (moved here from root level)
+  path_filters:
+    - "!**/node_modules/**"
+    - "!**/build/**"
+    - "!**/.git/**"
+    - "!**/translations/**"
 
   # Focus areas for Kill Switch code
   path_instructions:
@@ -27,16 +40,5 @@ reviews:
       instructions: |
         Test files. Ensure good coverage and meaningful assertions.
 
-  # Request changes vs comments
-  request_changes_workflow: true
-
 chat:
-  # Enable chat in PR comments
   auto_reply: true
-
-# Ignore generated/vendor files
-path_filters:
-  - "!**/node_modules/**"
-  - "!**/build/**"
-  - "!**/.git/**"
-  - "!**/translations/**"
