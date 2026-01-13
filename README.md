@@ -6,6 +6,7 @@
 
 # Nextcloud Sentinel Edition
 
+[![Status: Prototype](https://img.shields.io/badge/Status-Prototype-yellow.svg)](#project-status)
 [![CI - Windows](https://github.com/jlacerte/nextcloud-sentinel/actions/workflows/windows-build.yml/badge.svg)](https://github.com/jlacerte/nextcloud-sentinel/actions/workflows/windows-build.yml)
 [![CI - Linux](https://github.com/jlacerte/nextcloud-sentinel/actions/workflows/linux-build.yml/badge.svg)](https://github.com/jlacerte/nextcloud-sentinel/actions/workflows/linux-build.yml)
 [![License: GPL v2](https://img.shields.io/badge/License-GPL_v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
@@ -14,6 +15,76 @@
 **Nextcloud desktop client with built-in Kill Switch anti-ransomware protection.**
 
 > *"The fire crackles. Your files are protected."*
+
+---
+
+## Project Status
+
+> **This project is currently in early development (prototype stage).**
+
+We're building something new: a Nextcloud sync client that fights back against ransomware. This isn't a finished product yet - it's a working prototype that demonstrates our vision.
+
+| Milestone | Status |
+|-----------|--------|
+| Core Kill Switch engine | ✅ Complete |
+| Threat detectors (4 types) | ✅ Complete |
+| Desktop UI (Settings + Alerts) | ✅ Complete |
+| Test suite (81 tests) | ✅ Complete |
+| Windows build pipeline | ✅ Complete |
+| Linux build pipeline | ✅ Complete |
+| Android client | ⏳ Planned |
+| macOS native build | ⏳ Planned |
+| Production release | ⏳ Planned |
+
+### What Works Today
+
+- **Kill Switch detection** - Mass deletions, entropy analysis, pattern matching, canary files
+- **Automatic sync pause** - Stops damage before it spreads
+- **Threat dashboard** - Visual monitoring of security events
+- **Configuration presets** - Light, Standard, Paranoid modes
+
+### What's Coming
+
+- Pre-built installers for Windows/macOS/Linux
+- Android app with Kill Switch protection
+- Cloud-based threat intelligence
+- Enterprise management console
+
+---
+
+## The Vision
+
+Ransomware doesn't care about your backups if it encrypts them before they sync.
+
+Traditional sync clients are **dumb pipes** - they faithfully replicate whatever happens locally, including disasters. We believe sync clients should be **smart guardians** that recognize threats and protect your data.
+
+**Sentinel is our answer:** a sync client that watches for suspicious patterns and hits the brakes before catastrophe strikes.
+
+---
+
+## Roadmap
+
+```
+Q1 2026  ██████████░░░░░░░░░░  Prototype (we are here)
+         - Core engine complete
+         - Desktop UI functional
+         - CI/CD pipelines operational
+
+Q2 2026  ░░░░░░░░░░░░░░░░░░░░  Alpha Release
+         - Pre-built binaries
+         - Installation documentation
+         - Bug fixes from early testers
+
+Q3 2026  ░░░░░░░░░░░░░░░░░░░░  Beta Release
+         - Android client
+         - Stability improvements
+         - Performance optimization
+
+Q4 2026  ░░░░░░░░░░░░░░░░░░░░  Production Release
+         - v1.0 stable
+         - Enterprise features
+         - Support channels
+```
 
 ---
 
@@ -57,11 +128,9 @@ When suspicious activity is detected (mass deletions, file encryption patterns, 
 
 ---
 
-## Installation
+## Try It Yourself
 
-### Pre-built Binaries
-
-Coming soon - check [Releases](https://github.com/jlacerte/nextcloud-sentinel/releases).
+> **Note:** This is prototype software. Use at your own risk and always maintain separate backups.
 
 ### Build from Source
 
@@ -147,12 +216,17 @@ cd build && ctest -R KillSwitch --output-on-failure
 
 ---
 
-## Contributing
+## Join the Journey
 
-We welcome contributions! Please read:
+We're a small team with a big vision. If you believe sync clients should protect users, not just move bytes, we'd love your help.
 
-- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
-- [Code of Conduct](https://nextcloud.com/community/code-of-conduct/)
+### Ways to Contribute
+
+- **Test the prototype** - Build it, break it, tell us what happened
+- **Report bugs** - Every issue helps us improve
+- **Suggest features** - What would make Sentinel essential for you?
+- **Spread the word** - Star the repo, share with colleagues
+- **Code contributions** - PRs welcome! See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ### Development
 
@@ -202,10 +276,11 @@ See [COPYING](COPYING) for the full license text.
 
 - [Nextcloud GmbH](https://nextcloud.com) - Original desktop client
 - [CodeRabbit](https://coderabbit.ai) - AI code review
-- All contributors to this project
+- All early testers and contributors
 
 ---
 
 <p align="center">
-  <i>The fire crackles. The tunnel is behind us.</i>
+  <b>Sentinel is prototype software under active development.</b><br>
+  <i>The fire crackles. We're just getting started.</i>
 </p>
