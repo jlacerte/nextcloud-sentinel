@@ -11,6 +11,7 @@
 [![CI - Linux](https://github.com/jlacerte/nextcloud-sentinel/actions/workflows/linux-sentinel-ci.yml/badge.svg)](https://github.com/jlacerte/nextcloud-sentinel/actions/workflows/linux-sentinel-ci.yml)
 [![License: GPL v2](https://img.shields.io/badge/License-GPL_v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 [![CodeRabbit](https://img.shields.io/badge/CodeRabbit-AI%20Review-orange)](https://coderabbit.ai)
+[![Website](https://img.shields.io/badge/Website-nxtcloud.ca-blue)](https://nxtcloud.ca)
 
 **Nextcloud desktop client with built-in Kill Switch anti-ransomware protection.**
 
@@ -269,6 +270,14 @@ the Free Software Foundation; either version 2 of the License, or
 ```
 
 See [COPYING](COPYING) for the full license text.
+
+---
+
+## Developed By
+
+**[nxtcloud.ca](https://nxtcloud.ca)** - A Canadian initiative building secure, privacy-focused cloud solutions.
+
+We believe your data should be protected, not just stored. Sentinel is our answer to the growing ransomware threat.
 
 ---
 
