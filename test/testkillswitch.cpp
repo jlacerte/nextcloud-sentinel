@@ -582,7 +582,7 @@ private slots:
         QCOMPARE(result.level, ThreatLevel::None);
     }
 
-    void testPatternDetectorMediumThreatDoubleExtension()
+    void testPatternDetectorHighThreatDoubleExtension()
     {
         PatternDetector detector;
         detector.setThreshold(5); // High threshold so single file doesn't reach High
@@ -594,8 +594,8 @@ private slots:
         QVector<KillSwitchManager::Event> events;
         ThreatInfo result = detector.analyze(item, events);
 
-        // Double extension = Medium threat
-        QCOMPARE(result.level, ThreatLevel::Medium);
+        // Double extension = High threat (strong ransomware indicator)
+        QCOMPARE(result.level, ThreatLevel::High);
     }
 
     void testPatternDetectorAddCustomExtension()
@@ -853,9 +853,9 @@ private slots:
         QVector<KillSwitchManager::Event> events;
         ThreatInfo result = detector.analyze(item, events);
 
-        // Should be Medium (double extension) but not Critical
-        // User can dismiss single false positive
-        QVERIFY(result.level <= ThreatLevel::Medium);
+        // Double extension is now High threat (strong ransomware indicator)
+        // but not Critical - user can dismiss single false positive
+        QCOMPARE(result.level, ThreatLevel::High);
         QVERIFY(result.level != ThreatLevel::Critical);
     }
 
