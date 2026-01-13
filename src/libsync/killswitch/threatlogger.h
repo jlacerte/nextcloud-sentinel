@@ -38,7 +38,7 @@ namespace OCC {
  *   ]
  * }
  */
-class ThreatLogger : public QObject
+class OWNCLOUDSYNC_EXPORT ThreatLogger : public QObject
 {
     Q_OBJECT
 

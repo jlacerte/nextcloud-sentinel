@@ -24,7 +24,7 @@ class SyncFileItem;
  * - CanaryDetector: Detects modifications to honeypot/canary files
  * - PatternDetector: Detects ransomware extensions (.locked, .encrypted, ransom notes)
  */
-class ThreatDetector
+class OWNCLOUDSYNC_EXPORT ThreatDetector
 {
 public:
     virtual ~ThreatDetector() = default;

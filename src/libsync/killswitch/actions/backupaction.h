@@ -37,7 +37,7 @@ namespace OCC {
  * - Configurable size limits
  * - Logs all backup operations
  */
-class BackupAction : public SyncAction
+class OWNCLOUDSYNC_EXPORT BackupAction : public SyncAction
 {
 public:
     BackupAction();

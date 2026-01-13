@@ -21,7 +21,7 @@ namespace OCC {
  * - AlertAction: Notifies the user via system notification
  * - QuarantineAction: Moves suspicious files to quarantine
  */
-class SyncAction
+class OWNCLOUDSYNC_EXPORT SyncAction
 {
 public:
     virtual ~SyncAction() = default;

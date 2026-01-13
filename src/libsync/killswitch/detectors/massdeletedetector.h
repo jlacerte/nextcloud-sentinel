@@ -27,7 +27,7 @@ namespace OCC {
  * - node_modules, build, dist, .git, __pycache__, .cache
  * - These are commonly bulk-deleted during development
  */
-class MassDeleteDetector : public ThreatDetector
+class OWNCLOUDSYNC_EXPORT MassDeleteDetector : public ThreatDetector
 {
 public:
     MassDeleteDetector();

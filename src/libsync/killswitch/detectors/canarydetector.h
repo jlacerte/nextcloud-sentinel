@@ -22,7 +22,7 @@ namespace OCC {
  * - Any modification, deletion, or rename of canary files
  * - Immediate critical alert on any canary file change
  */
-class CanaryDetector : public ThreatDetector
+class OWNCLOUDSYNC_EXPORT CanaryDetector : public ThreatDetector
 {
 public:
     CanaryDetector();

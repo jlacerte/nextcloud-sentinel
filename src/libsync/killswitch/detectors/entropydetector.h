@@ -24,7 +24,7 @@ namespace OCC {
  * - Existing files with sudden entropy increase (indicating encryption)
  * - Patterns of multiple high-entropy file modifications
  */
-class EntropyDetector : public ThreatDetector
+class OWNCLOUDSYNC_EXPORT EntropyDetector : public ThreatDetector
 {
 public:
     EntropyDetector();

@@ -27,7 +27,7 @@ namespace OCC {
  * - Ransom note file detected: Critical threat (immediate trigger)
  * - Double extension pattern: Medium/High threat depending on count
  */
-class PatternDetector : public ThreatDetector
+class OWNCLOUDSYNC_EXPORT PatternDetector : public ThreatDetector
 {
 public:
     PatternDetector();

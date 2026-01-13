@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "owncloudlib.h"
+
 #include <QObject>
 #include <QVector>
 #include <QTimer>
@@ -34,7 +36,7 @@ enum class ThreatLevel {
 /**
  * @brief Structure describing a detected threat
  */
-struct ThreatInfo {
+struct OWNCLOUDSYNC_EXPORT ThreatInfo {
     ThreatLevel level;
     QString detectorName;
     QString description;
@@ -61,7 +63,7 @@ struct ThreatInfo {
  *         ├── BackupAction
  *         └── AlertAction
  */
-class KillSwitchManager : public QObject
+class OWNCLOUDSYNC_EXPORT KillSwitchManager : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(bool enabled READ isEnabled WRITE setEnabled NOTIFY enabledChanged)
