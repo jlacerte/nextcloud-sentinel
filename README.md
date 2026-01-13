@@ -1,115 +1,211 @@
 <!--
+  - SPDX-FileCopyrightText: 2026 Nextcloud Sentinel Project
   - SPDX-FileCopyrightText: 2017 Nextcloud GmbH and Nextcloud contributors
-  - SPDX-FileCopyrightText: 2011 Nextcloud GmbH and Nextcloud contributors
   - SPDX-License-Identifier: GPL-2.0-or-later
 -->
-# Nextcloud Desktop Client
 
-[![REUSE status](https://api.reuse.software/badge/github.com/nextcloud/desktop)](https://api.reuse.software/info/github.com/nextcloud/desktop)
+# Nextcloud Sentinel Edition
 
-The Nextcloud Desktop Client is a tool to synchronize files from Nextcloud Server with your computer.
+[![CI - Windows](https://github.com/jlacerte/nextcloud-sentinel/actions/workflows/windows-build.yml/badge.svg)](https://github.com/jlacerte/nextcloud-sentinel/actions/workflows/windows-build.yml)
+[![CI - Linux](https://github.com/jlacerte/nextcloud-sentinel/actions/workflows/linux-build.yml/badge.svg)](https://github.com/jlacerte/nextcloud-sentinel/actions/workflows/linux-build.yml)
+[![License: GPL v2](https://img.shields.io/badge/License-GPL_v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
+[![CodeRabbit](https://img.shields.io/badge/CodeRabbit-AI%20Review-orange)](https://coderabbit.ai)
+
+**Nextcloud desktop client with built-in Kill Switch anti-ransomware protection.**
+
+> *"The fire crackles. Your files are protected."*
+
+---
+
+## What is Sentinel?
+
+Sentinel is a security-enhanced fork of the [Nextcloud Desktop Client](https://github.com/nextcloud/desktop) that adds **proactive ransomware protection** through an intelligent Kill Switch system.
+
+When suspicious activity is detected (mass deletions, file encryption patterns, canary file tampering), Sentinel **automatically pauses sync** to prevent damage from spreading to your Nextcloud server.
+
+---
+
+## Key Features
+
+### Kill Switch Protection
+
+| Feature | Description |
+|---------|-------------|
+| **Mass Delete Detection** | Triggers when too many files are deleted in a short time window |
+| **Entropy Analysis** | Detects encrypted/ransomware files by analyzing file entropy patterns |
+| **Pattern Detection** | Recognizes 80+ known ransomware file extensions (.locked, .encrypted, .cry, etc.) |
+| **Canary Files** | Monitors honeypot files - if they're touched, something's wrong |
+| **Automatic Backup** | Creates safety snapshots before suspicious operations |
+
+### Threat Dashboard
+
+- Real-time threat level indicator
+- History of detected threats with timestamps
+- Configurable sensitivity presets (Light / Standard / Paranoid)
+- One-click sync resume after false positives
+
+---
+
+## Why Sentinel?
+
+| Scenario | Standard Client | Sentinel |
+|----------|-----------------|----------|
+| Ransomware encrypts 1000 files | All synced to server | **Blocked after ~10 files** |
+| Accidental mass delete | Synced immediately | **Paused for confirmation** |
+| Suspicious file patterns | No detection | **Alert + auto-pause** |
+| Recovery options | Restore from server | **Local backup + server intact** |
+
+---
+
+## Installation
+
+### Pre-built Binaries
+
+Coming soon - check [Releases](https://github.com/jlacerte/nextcloud-sentinel/releases).
+
+### Build from Source
+
+#### Windows (Quick Start)
+
+```bash
+# Clone the repository
+git clone https://github.com/jlacerte/nextcloud-sentinel.git
+cd nextcloud-sentinel
+
+# Run the setup script
+.\CLICK-ME-FIRST.bat
+```
+
+#### Linux (Docker)
+
+```bash
+git clone https://github.com/jlacerte/nextcloud-sentinel.git
+cd nextcloud-sentinel
+
+# Build using Docker
+./build-wsl.sh --docker
+```
+
+#### Full Build Instructions
+
+See [SENTINEL-BUILD-PLAN.md](SENTINEL-BUILD-PLAN.md) for detailed build instructions.
+
+---
+
+## Configuration
+
+### Kill Switch Settings
+
+Access via: **Settings > Kill Switch**
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Delete Threshold | 10 files | Max deletions before trigger |
+| Time Window | 60 seconds | Monitoring window |
+| Entropy Threshold | 7.5 | Shannon entropy limit (max 8.0) |
+| Auto-Backup | Enabled | Backup before suspicious ops |
+
+### Presets
+
+- **Light**: Higher thresholds, fewer false positives
+- **Standard**: Balanced protection (recommended)
+- **Paranoid**: Maximum security, may have more alerts
+
+---
+
+## Architecture
+
+```
+src/libsync/killswitch/
+├── killswitchmanager.cpp    # Main orchestrator
+├── threatdetector.h         # Detector interface
+├── threatlogger.cpp         # Threat history
+├── detectors/
+│   ├── massdeletedetector   # Volume-based detection
+│   ├── entropydetector      # Entropy analysis
+│   ├── patterndetector      # Extension matching
+│   └── canarydetector       # Honeypot monitoring
+└── actions/
+    ├── syncaction           # Pause/resume sync
+    └── backupaction         # Safety snapshots
+```
+
+---
+
+## Testing
+
+```bash
+# Run Kill Switch tests
+cd build && ctest -R KillSwitch --output-on-failure
+```
+
+**Test coverage:** 81 tests covering:
+- False positive scenarios
+- Edge cases (empty files, long paths, unicode)
+- Thread safety
+- Cache and timing
+
+---
+
+## Contributing
+
+We welcome contributions! Please read:
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
+- [Code of Conduct](https://nextcloud.com/community/code-of-conduct/)
+
+### Development
+
+```bash
+# Create a feature branch
+git checkout -b feature/my-feature
+
+# Make changes and test
+./build-wsl.sh --docker
+cd build-docker && ctest -R KillSwitch
+
+# Submit a PR
+```
+
+All PRs are automatically reviewed by [CodeRabbit AI](https://coderabbit.ai) in French.
+
+---
+
+## Security
+
+Found a security vulnerability? Please read [SECURITY.md](SECURITY.md) for responsible disclosure guidelines.
+
+**Do NOT open a public issue for security vulnerabilities.**
+
+---
+
+## Upstream
+
+Sentinel is based on [Nextcloud Desktop Client](https://github.com/nextcloud/desktop). We regularly sync with upstream to get the latest features and fixes.
+
+---
+
+## License
+
+```
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+```
+
+See [COPYING](COPYING) for the full license text.
+
+---
+
+## Acknowledgments
+
+- [Nextcloud GmbH](https://nextcloud.com) - Original desktop client
+- [CodeRabbit](https://coderabbit.ai) - AI code review
+- All contributors to this project
+
+---
 
 <p align="center">
-    <img src="doc/images/main_dialog_christine.png" alt="Desktop Client on Windows" width="450">
+  <i>The fire crackles. The tunnel is behind us.</i>
 </p>
-
-## :rocket: Releases
-For the latest stable recommended version, please refer to the [download page https://nextcloud.com/install/#install-clients](https://nextcloud.com/install/#install-clients)
-
-## Contributing to the desktop client
-:v: Please read the [Code of Conduct](https://nextcloud.com/community/code-of-conduct/). This document offers some guidance to ensure Nextcloud participants can cooperate effectively in a positive and inspiring atmosphere and to explain how together we can strengthen and support each other.
-
-### 👪 Join the team
-There are many ways to contribute, of which development is only one! Find out [how to get involved](https://nextcloud.com/contribute/), including as a translator, designer, tester, helping others, and much more! 😍
-
-### Help testing
-Download and install the client:<br>
-[🔽 All releases](https://github.com/nextcloud-releases/desktop/releases)<br>
-[🔽 Daily master builds](https://download.nextcloud.com/desktop/daily)
-
-### Reporting issues
-If you find any bugs or have any suggestion for improvement, please
-[open an issue in this repository](https://github.com/nextcloud/desktop/issues).
-
-### Bug fixing and development
-
-> [!TIP]
-> For building the client on macOS we have a tool called `mac-crafter`.
-> You will find more information about it in [its dedicated README](admin/osx/mac-crafter/README.md).
-> Also, please note the [README in the NextcloudIntegration project](shell_integration/MacOSX/NextcloudIntegration/README.md) which provides an even more convenient way to work on and build the desktop client on macOS by using Xcode.
-
-#### 1. 🚀 Set up your local development environment
-
-> [!NOTE]  
-> Find the system requirements and instructions on [how to work on Windows with KDE Craft](https://github.com/nextcloud/desktop-client-blueprints/) on our [desktop client blueprints repository](https://github.com/nextcloud/desktop-client-blueprints/).
-
-1.1 System requirements
-- [Windows 10, Windows 11](https://github.com/nextcloud/desktop-client-blueprints/), macOS 10.14 Mojave (or newer) or Linux
-- [🔽 Inkscape (to generate icons)](https://inkscape.org/release/)
-- Developer tools: cmake, clang/gcc/g++:
-- Qt6 since 3.14, Qt5 for earlier versions
-- OpenSSL
-- [🔽 QtKeychain](https://github.com/frankosterfeld/qtkeychain)
-- SQLite
-
-1.2 Optional
-- [Qt Creator IDE](https://www.qt.io/product/development-tools)
-- [delta: A viewer for git and diff output](https://github.com/dandavison/delta)
-
-> [!TIP]
-> We highly recommend [Nextcloud development environment on Docker Compose](https://juliusknorr.github.io/nextcloud-docker-dev/) for testing/bug fixing/development.<br>
-> ▶️ https://juliusknorr.github.io/nextcloud-docker-dev/
-
-1.3 Step by step instructions on how to build the client to contribute
-1. Clone the Github repository:
-```
-git clone https://github.com/nextcloud/desktop.git
-```
-2. Create <build directory>:
-```
-mkdir <build directory>
-```
-3. Compile:
-```
-cd <build directory>
-cmake -S <cloned desktop repo> -B build -DCMAKE_PREFIX_PATH=<dependencies> -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=. -DNEXTCLOUD_DEV=ON
-```
-
-> [!TIP]
-> The cmake variable NEXTCLOUD_DEV allows you to run your own build of the client while developing in parallel with an installed version of the client.
-
-4. Build it:
-- Windows:
-```
-cmake --build .
-```
-- Other platforms:
-```
-make
-```
-
-5. 🐛 [Pick a good first issue](https://github.com/nextcloud/desktop/labels/good%20first%20issue)
-6. 👩‍🔧 Create a branch and make your changes. Remember to sign off your commits using `git commit -sm "Your commit message"`
-7. ⬆ Create a [pull request](https://opensource.guide/how-to-contribute/#opening-a-pull-request) and `@mention` the people from the issue to review
-8. 👍 Fix things that come up during a review
-9. 🎉 Wait for it to get merged!
-
-## Get in touch 💬
-* [📋 Forum](https://help.nextcloud.com)
-* [👥 Facebook](https://www.facebook.com/nextclouders)
-* [🐣 Twitter](https://twitter.com/Nextclouders)
-* [🐘 Mastodon](https://mastodon.xyz/@nextcloud)
-
-You can also [get support for Nextcloud](https://nextcloud.com/support)!
-
-## :scroll: License
-
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful, but
-    WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-    or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
-    for more details.
