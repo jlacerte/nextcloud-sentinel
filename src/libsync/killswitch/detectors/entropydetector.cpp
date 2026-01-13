@@ -128,7 +128,6 @@ double EntropyDetector::calculateMultiBlockEntropy(const QString &filePath) cons
 
     // Read and analyze each sample
     double maxEntropy = 0.0;
-    double totalEntropy = 0.0;
     int sampleCount = 0;
 
     for (qint64 offset : sampleOffsets) {
@@ -150,7 +149,6 @@ double EntropyDetector::calculateMultiBlockEntropy(const QString &filePath) cons
         }
 
         double entropy = calculateEntropy(sample);
-        totalEntropy += entropy;
         sampleCount++;
 
         if (entropy > maxEntropy) {
@@ -170,8 +168,7 @@ double EntropyDetector::calculateMultiBlockEntropy(const QString &filePath) cons
         return -1.0;
     }
 
-    // Return the maximum entropy found (most conservative approach)
-    // Alternatively, could return average: totalEntropy / sampleCount
+    // Return the maximum entropy found (most conservative approach for security)
     return maxEntropy;
 }
 
