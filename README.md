@@ -7,8 +7,8 @@
 # Nextcloud Sentinel Edition
 
 [![Status: Prototype](https://img.shields.io/badge/Status-Prototype-yellow.svg)](#project-status)
-[![CI - Windows](https://github.com/jlacerte/nextcloud-sentinel/actions/workflows/windows-build.yml/badge.svg)](https://github.com/jlacerte/nextcloud-sentinel/actions/workflows/windows-build.yml)
-[![CI - Linux](https://github.com/jlacerte/nextcloud-sentinel/actions/workflows/linux-build.yml/badge.svg)](https://github.com/jlacerte/nextcloud-sentinel/actions/workflows/linux-build.yml)
+[![CI - Windows](https://github.com/jlacerte/nextcloud-sentinel/actions/workflows/windows-sentinel-ci.yml/badge.svg)](https://github.com/jlacerte/nextcloud-sentinel/actions/workflows/windows-sentinel-ci.yml)
+[![CI - Linux](https://github.com/jlacerte/nextcloud-sentinel/actions/workflows/linux-sentinel-ci.yml/badge.svg)](https://github.com/jlacerte/nextcloud-sentinel/actions/workflows/linux-sentinel-ci.yml)
 [![License: GPL v2](https://img.shields.io/badge/License-GPL_v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 [![CodeRabbit](https://img.shields.io/badge/CodeRabbit-AI%20Review-orange)](https://coderabbit.ai)
 
