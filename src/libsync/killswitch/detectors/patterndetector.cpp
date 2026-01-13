@@ -256,7 +256,7 @@ ThreatInfo PatternDetector::analyze(const SyncFileItem &item,
         threat.description = QStringLiteral("Multiple ransomware patterns detected: %1 suspicious files")
                                  .arg(suspiciousCount);
     } else if (hasDoubleExt) {
-        threat.level = ThreatLevel::Medium;
+        threat.level = ThreatLevel::High;  // Double extension is a strong ransomware indicator
         threat.description = QStringLiteral("Suspicious double extension: %1").arg(fileName);
     } else {
         threat.level = ThreatLevel::Low;
