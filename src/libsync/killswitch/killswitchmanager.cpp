@@ -13,6 +13,8 @@
 
 #include <QLoggingCategory>
 #include <QMutexLocker>
+#include <QtConcurrent>
+#include <QFutureSynchronizer>
 #include <algorithm>
 
 namespace OCC {
@@ -112,9 +114,25 @@ bool KillSwitchManager::analyzeItem(const SyncFileItem &item)
 
     recordEvent(eventType, item._file);
 
-    // Run through all detectors
+    // Run all detectors in parallel for better performance
+    // Take a local copy of events for thread-safe access
+    QVector<Event> events = m_recentEvents;
+
+    QVector<QFuture<ThreatInfo>> futures;
+    futures.reserve(m_detectors.size());
+
     for (const auto &detector : m_detectors) {
-        ThreatInfo threat = detector->analyze(item, m_recentEvents);
+        futures.append(QtConcurrent::run([detector, &item, events]() {
+            return detector->analyze(item, events);
+        }));
+    }
+
+    // Collect results from all detectors
+    ThreatInfo highestThreat;
+    highestThreat.level = ThreatLevel::None;
+
+    for (auto &future : futures) {
+        ThreatInfo threat = future.result();
         if (threat.level != ThreatLevel::None) {
             threat.timestamp = QDateTime::currentDateTime();
             m_threats.append(threat);
@@ -125,11 +143,17 @@ bool KillSwitchManager::analyzeItem(const SyncFileItem &item)
 
             emit threatDetected(threat);
 
-            if (threat.level >= ThreatLevel::High) {
-                trigger(threat.description);
-                return true; // Block this item
+            // Track highest threat level found
+            if (threat.level > highestThreat.level) {
+                highestThreat = threat;
             }
         }
+    }
+
+    // Trigger on highest threat if High or Critical
+    if (highestThreat.level >= ThreatLevel::High) {
+        trigger(highestThreat.description);
+        return true; // Block this item
     }
 
     evaluateThreatLevel();
